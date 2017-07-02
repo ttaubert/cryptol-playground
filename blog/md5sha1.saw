@@ -1,0 +1,9 @@
+import "md5.cry";
+import "sha-0-1.cry";
+
+let {{
+  md5sha1 r msg = (md5' r msg) # (sha' True r msg)
+  p_concat r x y = (x > 0) && (y > 0) && (x != y) && (md5sha1 r [x] == md5sha1 r [y])
+}};
+
+time (sat_print abc {{ p_concat 16 }});

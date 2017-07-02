@@ -1,0 +1,14 @@
+import "utf.cry";
+
+m <- llvm_load_module "utf.bc";
+
+llvm_verify m "utf16to8_len" [] do {
+  llvm_ptr "buf" (llvm_array 8 (llvm_int 8));
+  buf <- llvm_var "*buf" (llvm_array 8 (llvm_int 8));
+  len <- llvm_var "len" (llvm_int 32);
+
+  llvm_assert_eq "len" {{ 8 : [32] }};
+  llvm_return {{ utf16to8_len buf }};
+
+  llvm_verify_tactic abc;
+};

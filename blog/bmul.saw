@@ -1,0 +1,101 @@
+m <- llvm_load_module "bmul.bc";
+
+let {{
+  mul : [64] -> [64] -> ([64], [64])
+  mul a b = (take`{64} prod, drop`{64} prod)
+      where prod = pad (pmult a b)
+            pad x = zero # x
+
+  bmul32 : [32] -> [32] -> ([32], [32])
+  bmul32 a b = (take`{32} prod, drop`{32} prod)
+      where prod = pad (pmult a b)
+            pad x = zero # x
+
+  hashmult32 : [128] -> [128] -> [128] -> ([64], [64])
+  hashmult32 h x buf = (take`{64} res, drop`{64} res)
+      where prod = pmod (pmult (reverse h) xor) <|x^^128 + x^^7 + x^^2 + x + 1|>
+            xor = (reverse x) ^ (reverse buf)
+            res = reverse prod
+}};
+
+/*llvm_verify m "mul_new" [] do {
+  x <- llvm_var "x" (llvm_int 64);
+  y <- llvm_var "y" (llvm_int 64);
+  llvm_ptr "r_high" (llvm_int 64);
+  r_high <- llvm_var "*r_high" (llvm_int 64);
+  llvm_ptr "r_low" (llvm_int 64);
+  r_low <- llvm_var "*r_low" (llvm_int 64);
+
+  let res = {{ mul x y }};
+  llvm_ensure_eq "*r_high" {{ res.0 }};
+  llvm_ensure_eq "*r_low" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+};*/
+
+v1 <- time(llvm_verify m "bmul32" [] do {
+  x <- llvm_var "x" (llvm_int 32);
+  y <- llvm_var "y" (llvm_int 32);
+  llvm_ptr "r_high" (llvm_int 32);
+  r_high <- llvm_var "*r_high" (llvm_int 32);
+  llvm_ptr "r_low" (llvm_int 32);
+  r_low <- llvm_var "*r_low" (llvm_int 32);
+
+  let res = {{ bmul32 x y }};
+  llvm_ensure_eq "*r_high" {{ res.0 }};
+  llvm_ensure_eq "*r_low" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+});
+
+/*time(llvm_verify m "gcm_HashMult_sftw" [] do {
+  h_hi <- llvm_var "h_high" (llvm_int 64);
+  h_lo <- llvm_var "h_low" (llvm_int 64);
+  x_hi <- llvm_var "x_high" (llvm_int 64);
+  x_lo <- llvm_var "x_low" (llvm_int 64);
+  llvm_ptr "buf" (llvm_array 32 (llvm_int 8));
+  buf <- llvm_var "*buf" (llvm_array 32 (llvm_int 8));
+  count <- llvm_var "count" (llvm_int 64);
+
+  llvm_ptr "r_high" (llvm_int 64);
+  r_high <- llvm_var "*r_high" (llvm_int 64);
+  llvm_ptr "r_low" (llvm_int 64);
+  r_low <- llvm_var "*r_low" (llvm_int 64);
+
+  //llvm_assert_eq "h_high" {{ zero : [64] }};
+  //llvm_assert_eq "h_low" {{ zero : [64] }};
+  llvm_assert_eq "count" {{ 2 : [64] }};
+
+  let split = {{ (take`{16} buf, drop`{16} buf) }};
+  let res0 = {{ hashmult32 (join [h_hi, h_lo]) (join [x_hi, x_lo]) (join split.0) }};
+  let res = {{ hashmult32 (join [h_hi, h_lo]) (join [res0.0, res0.1]) (join split.1) }};
+  llvm_ensure_eq "*r_high" {{ res.0 }};
+  llvm_ensure_eq "*r_low" {{ res.1 }};
+
+  //llvm_verify_tactic abc;
+  llvm_verify_tactic (quickcheck 1000);
+});*/
+
+time(llvm_verify m "gcm_HashMult_sftw32" [v1] do {
+  h_hi <- llvm_var "h_high" (llvm_int 64);
+  h_lo <- llvm_var "h_low" (llvm_int 64);
+  x_hi <- llvm_var "x_high" (llvm_int 64);
+  x_lo <- llvm_var "x_low" (llvm_int 64);
+  llvm_ptr "buf" (llvm_array 16 (llvm_int 8));
+  buf <- llvm_var "*buf" (llvm_array 16 (llvm_int 8));
+
+  llvm_ptr "r_high" (llvm_int 64);
+  r_high <- llvm_var "*r_high" (llvm_int 64);
+  llvm_ptr "r_low" (llvm_int 64);
+  r_low <- llvm_var "*r_low" (llvm_int 64);
+
+  //llvm_assert_eq "h_high" {{ zero : [64] }};
+  //llvm_assert_eq "h_low" {{ zero : [64] }};
+
+  let res = {{ hashmult32 (join [h_hi, h_lo]) (join [x_hi, x_lo]) (join buf) }};
+  llvm_ensure_eq "*r_high" {{ res.0 }};
+  llvm_ensure_eq "*r_low" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+  //llvm_verify_tactic (quickcheck 1000);
+});

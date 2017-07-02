@@ -1,0 +1,8 @@
+m1 <- llvm_load_module "add.bc";
+m2 <- llvm_load_module "cadd.bc";
+
+add <- llvm_extract m1 "add" llvm_pure;
+cadd <- llvm_extract m2 "add" llvm_pure;
+
+let thm = {{ \x y -> add x y == cadd x y }};
+prove_print abc thm;

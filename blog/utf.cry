@@ -1,0 +1,39 @@
+is_hi_surrogate x = (x && 0xFC00) == 0xD800
+is_lo_surrogate x = (x && 0xFC00) == 0xDC00
+
+check_utf16 : {n} (fin n) => [n]([16], [16]) -> Bit
+check_utf16 xs = if is_lo_surrogate (xs @ 0).0 then False else (ys ! 0)
+    where ys = [True] # [ y && check x | x <- xs | y <- ys ]
+          check (x, y) = is_hi_surrogate x == is_lo_surrogate y
+
+pairs xs = [ (x, y) | x <- take`{back=1} xs | y <- drop`{1} xs ]
+
+utf16to8_len : {n,m} (fin n, n >= 2, n == 2 * m) => [n][8] -> [32]
+utf16to8_len xs = if check_utf16 ps then (ys ! 0) else 0
+    where ys = [0] # [ y + len x | x <- ms | y <- ys ]
+          ms = [ join x | x <- groupBy`{2} xs ]
+          ps = pairs (ms # [0])
+
+len x = if x < 0x0080 then 1
+         | x < 0x0800 then 2
+         | is_lo_surrogate x then 0
+         | is_hi_surrogate x then 4
+           else 3
+
+property single = [ utf16to8_len v == e | (v, e) <- vs ] == ~zero
+    where vs = [([0x00, 0x01], 1), ([0x00, 0x7F], 1),
+                ([0x00, 0x80], 2), ([0x07, 0xFF], 2),
+                ([0x80, 0x00], 3), ([0xFF, 0xFF], 3)]
+
+property double = [ utf16to8_len v == e | (v, e) <- vs ] == ~zero
+    where vs = [([0xD8, 0x00, 0xDC, 0x00], 4),
+                ([0xDB, 0xFF, 0xDF, 0xFF], 4)]
+
+property wrong = [ utf16to8_len v == e | (v, e) <- vs ] == ~zero
+    where vs = [([0xDC, 0x00, 0xD8, 0x00, 0x00, 0x00], 0),
+                ([0xD8, 0x00, 0xDC, 0x00, 0xDC, 0x00], 0)]
+
+property bug1 = utf16to8_len [0xF8, 0x00, 0x00, 0x00] == 4
+property bug2 = utf16to8_len [0xDC, 0x00, 0x00, 0x00] == 0
+property bug3 = utf16to8_len [0x00, 0x80, 0x00, 0x00] == 3
+property bug4 = utf16to8_len [0x00, 0x00, 0xD8, 0x00] == 0

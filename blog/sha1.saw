@@ -1,0 +1,11 @@
+// https://github.com/GaloisInc/sat2015-crypto/blob/master/examples/SHA-0-1.cry
+
+import "sha-0-1.cry";
+
+let {{
+  p_coll fix r x y = (x != y) && (sha' fix r [x] == sha' fix r [y])
+}};
+
+time (sat_print abc {{ p_coll False 21 }});
+
+time (sat_print abc {{ p_coll True 21 }});

@@ -1,0 +1,7 @@
+import "md5.cry";
+
+let {{
+  p_coll r x y = (x != y) && (md5' r [x] == md5' r [y])
+}};
+
+time (sat_print abc {{ p_coll 27 }});

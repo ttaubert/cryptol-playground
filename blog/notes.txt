@@ -1,0 +1,13 @@
+[MD5]
+rounds=27/64 secs=59 (collision)
+
+[SHA-0]
+rounds=20/80 secs=29 (collision)
+rounds=21/80 secs=366 (collision)
+
+[SHA-1]
+rounds=20/80 secs=29 (collision)
+rounds=21/80 secs=471 (collision)
+
+[MD5+SHA-1]
+rounds=15/64|80 secs=0.6 (collision)

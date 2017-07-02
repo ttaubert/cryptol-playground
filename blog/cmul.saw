@@ -1,0 +1,23 @@
+m <- llvm_load_module "cmul.bc";
+
+let {{
+  mul : [8] -> [8] -> ([8], [8])
+  mul a b = (take`{8} prod, drop`{8} prod)
+      where prod = (pad a) * (pad b)
+            pad x = zero # x
+}};
+
+llvm_verify m "mul" [] do {
+  a <- llvm_var "a" (llvm_int 8);
+  b <- llvm_var "b" (llvm_int 8);
+  llvm_ptr "hi" (llvm_int 8);
+  hi <- llvm_var "*hi" (llvm_int 8);
+  llvm_ptr "lo" (llvm_int 8);
+  lo <- llvm_var "*lo" (llvm_int 8);
+
+  let res = {{ mul a b }};
+  llvm_ensure_eq "*hi" {{ res.0 }};
+  llvm_ensure_eq "*lo" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+};
