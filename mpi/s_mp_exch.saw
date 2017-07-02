@@ -1,0 +1,82 @@
+let {{
+  s_mp_exch : {n,m} (fin n, n >= 1, fin m, m >= 1) => [n][64] -> [m][64] -> [32] -> [n][64]
+  s_mp_exch xs ys u = (zs ! 0).0
+      where zs = [(xs, ys, u)] # [ next x z | x <- xs | z <- zs ]
+            next x z = ((tail z.0) # item, z.1 << 1, counter)
+                where item = if z.2 > 0 then (take`{1} z.1) else [x]
+                      counter = if z.2 > 0 then z.2 - 1 else 0
+}};
+
+llvm_verify m "s_mp_exch" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 7 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 7 (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array 7 (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array 7 (llvm_int 64));
+
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+  llvm_assert {{ used >= 1 && used <= alloc && used <= alloc2 }};
+  llvm_assert {{ used2 >= 1 && used2 <= alloc2 && used2 <= alloc }};
+  llvm_assert_eq "a->1" {{ 7:[32] }}; /* alloc */
+  llvm_assert_eq "b->1" {{ 7:[32] }}; /* alloc */
+
+  let na = {{ s_mp_exch dp dp2 used2 }};
+  let nb = {{ s_mp_exch dp2 dp used }};
+
+  llvm_ensure_eq "a->0" {{ sign2 }};
+  llvm_ensure_eq "a->1" {{ alloc }};
+  llvm_ensure_eq "a->2" {{ used2 }};
+  llvm_ensure_eq "*(a->3)" {{ na }};
+
+  llvm_ensure_eq "b->0" {{ sign }};
+  llvm_ensure_eq "b->1" {{ alloc2 }};
+  llvm_ensure_eq "b->2" {{ used }};
+  llvm_ensure_eq "*(b->3)" {{ nb }};
+
+  llvm_verify_tactic abc;
+};
+
+llvm_verify m "s_mp_exch" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 7 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 7 (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array 5 (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+  llvm_assert {{ used >= 1 && used <= alloc && used <= alloc2 }};
+  llvm_assert {{ used2 >= 1 && used2 <= alloc2 && used2 <= alloc }};
+  llvm_assert_eq "a->1" {{ 7:[32] }}; /* alloc */
+  llvm_assert_eq "b->1" {{ 5:[32] }}; /* alloc */
+
+  let na = {{ s_mp_exch dp dp2 used2 }};
+  let nb = {{ s_mp_exch dp2 dp used }};
+
+  llvm_ensure_eq "a->0" {{ sign2 }};
+  llvm_ensure_eq "a->1" {{ alloc }};
+  llvm_ensure_eq "a->2" {{ used2 }};
+  llvm_ensure_eq "*(a->3)" {{ na }};
+
+  llvm_ensure_eq "b->0" {{ sign }};
+  llvm_ensure_eq "b->1" {{ alloc2 }};
+  llvm_ensure_eq "b->2" {{ used }};
+  llvm_ensure_eq "*(b->3)" {{ nb }};
+
+  llvm_verify_tactic abc;
+};

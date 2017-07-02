@@ -1,0 +1,10 @@
+asn1_int : {n} (fin n, n >= 1) => [n][8] -> [32]
+asn1_int xs = if overflowed then max_val else join (take`{4} bytes)
+    where (bytes, overflowed) = ys ! 0
+          ys = init # [ (a << 1, b || ~is_valid a) | (a, b) <- ys | x <- drop`{1} xs ]
+          is_valid x = (x @ 0) == fill && mask (x @ 1) == sign
+          init = [([fill, fill, fill] # xs, False)]
+          max_val = if sign == 0 then 0x7fffffff else 0x80000000
+          fill = (sign <<< 1) * -1
+          sign = mask (xs @ 0)
+          mask x = x && 0x80

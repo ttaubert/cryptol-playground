@@ -1,0 +1,16 @@
+import "asn1_length.cry";
+
+print "Extracting reference term";
+l <- llvm_load_module "asn1_length.bc";
+
+xs <- fresh_symbolic "xs" {| [2][8] |};
+let allocs = [ ("buf", 2) ];
+let inputs = [ ("*buf", xs, 2)
+             , ("len", {{ 2:[32] }}, 1)
+             ];
+
+let outputs = [("return", 1)];
+t <- llvm_symexec l "der_indefinite_length" allocs inputs outputs true;
+
+thm1 <- abstract_symbolic {{ t == asn1_indef_contents_length xs }};
+prove_print abc thm1;

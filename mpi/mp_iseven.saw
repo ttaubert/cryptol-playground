@@ -1,0 +1,21 @@
+let {{
+  mp_iseven : {n} (fin n, n >= 64) => [n] -> [32]
+  mp_iseven x = if (x && 1) == 1 then 0 else 1
+}};
+
+log "verify passing an mp_int";
+time (llvm_verify m "mp_iseven" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_assert_eq "a->1" {{ 5:[32] }}; /* alloc */
+  llvm_assert {{ used > 0 && used <= alloc }};
+  llvm_assert {{ sign < 2 }};
+
+  llvm_return {{ mp_iseven (jrev dp) }};
+  llvm_verify_tactic abc;
+});

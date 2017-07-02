@@ -1,0 +1,115 @@
+import "mxfp.cry";
+
+m <- llvm_load_module "mxfp.bc";
+
+let msb_spec = do {
+  x <- llvm_var "x" (llvm_int 64);
+  llvm_return {{ msb x }};
+  llvm_verify_tactic abc;
+};
+
+let eq_z_spec = do {
+  x <- llvm_var "x" (llvm_int 64);
+  llvm_return {{ eq_z x }};
+  llvm_verify_tactic abc;
+};
+
+let lt_spec = do {
+  a <- llvm_var "a" (llvm_int 64);
+  b <- llvm_var "b" (llvm_int 64);
+  llvm_return {{ lt a b }};
+  llvm_verify_tactic abc;
+};
+
+let u64_add_spec = do {
+  a <- llvm_var "a" (llvm_int 64);
+  b <- llvm_var "b" (llvm_int 64);
+  llvm_ptr "c" (llvm_int 64);
+  c <- llvm_var "*c" (llvm_int 64);
+  carryIn <- llvm_var "carryIn" (llvm_int 64);
+  llvm_ptr "carryOut" (llvm_int 64);
+  carryOut <- llvm_var "*carryOut" (llvm_int 64);
+
+  llvm_assert {{ carryIn <= 1 }};
+  llvm_return {{ 0:[64] }};
+
+  let res = {{ u64_add a b carryIn }};
+  llvm_ensure_eq "*c" {{ res.0 }};
+  llvm_ensure_eq "*carryOut" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+};
+
+let u64_sub_spec = do {
+  a <- llvm_var "a" (llvm_int 64);
+  b <- llvm_var "b" (llvm_int 64);
+  llvm_ptr "c" (llvm_int 64);
+  c <- llvm_var "*c" (llvm_int 64);
+  carryIn <- llvm_var "carryIn" (llvm_int 64);
+  llvm_ptr "carryOut" (llvm_int 64);
+  carryOut <- llvm_var "*carryOut" (llvm_int 64);
+
+  llvm_assert {{ carryIn <= 1 }};
+  llvm_return {{ 0:[64] }};
+
+  let res = {{ u64_sub a b carryIn }};
+  llvm_ensure_eq "*c" {{ res.0 }};
+  llvm_ensure_eq "*carryOut" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+};
+
+let u64_mul_spec = do {
+  a <- llvm_var "a" (llvm_int 64);
+  b <- llvm_var "b" (llvm_int 64);
+  llvm_ptr "hi" (llvm_int 64);
+  hi <- llvm_var "*hi" (llvm_int 64);
+  llvm_ptr "lo" (llvm_int 64);
+  lo <- llvm_var "*lo" (llvm_int 64);
+
+  llvm_return {{ 0:[64] }};
+
+  let res = {{ u64_mul a b }};
+  llvm_ensure_eq "*hi" {{ res.0 }};
+  llvm_ensure_eq "*lo" {{ res.1 }};
+
+  llvm_verify_tactic (quickcheck 10);
+  //llvm_verify_tactic abc;
+};
+
+let u64_square_spec = do {
+  x <- llvm_var "x" (llvm_int 64);
+  llvm_ptr "hi" (llvm_int 64);
+  hi <- llvm_var "*hi" (llvm_int 64);
+  llvm_ptr "lo" (llvm_int 64);
+  lo <- llvm_var "*lo" (llvm_int 64);
+
+  llvm_return {{ 0:[64] }};
+
+  let res = {{ u64_square x }};
+  llvm_ensure_eq "*hi" {{ res.0 }};
+  llvm_ensure_eq "*lo" {{ res.1 }};
+
+  llvm_verify_tactic abc;
+};
+
+print "Verifying msb";
+msb_ov <- time (llvm_verify m "msb" [] msb_spec);
+
+print "Verifying eq_z";
+eq_z_ov <- time (llvm_verify m "eq_z" [msb_ov] eq_z_spec);
+
+print "Verifying lt";
+lt_ov <- time (llvm_verify m "lt" [msb_ov] lt_spec);
+
+print "Verifying u64_add";
+u64_add_ov <- time (llvm_verify m "u64_add" [msb_ov, eq_z_ov, lt_ov] u64_add_spec);
+
+print "Verifying u64_sub";
+u64_sub_ov <- time (llvm_verify m "u64_sub" [msb_ov, eq_z_ov, lt_ov] u64_sub_spec);
+
+print "Verifying u64_mul";
+u64_mul_ov <- time (llvm_verify m "u64_mul" [msb_ov, eq_z_ov, lt_ov, u64_add_ov] u64_mul_spec);
+
+print "Verifying u64_square";
+u64_square_ov <- time (llvm_verify m "u64_square" [msb_ov, eq_z_ov, lt_ov, u64_mul_ov] u64_square_spec);

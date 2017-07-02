@@ -1,0 +1,34 @@
+import "utf16_to_utf8_len.cry";
+
+/*print "Extracting reference term";
+l <- llvm_load_module "utf16_to_utf8_len.bc";
+
+xs <- fresh_symbolic "xs" {| [4][8] |};
+let allocs = [ ("buf", 4) ];
+let inputs = [ ("*buf", xs, 4)
+             , ("len", {{ 4:[32] }}, 1)
+             ];
+
+let outputs = [("return", 1)];
+t <- llvm_symexec l "utf16_to_utf8_len" allocs inputs outputs true;
+
+thm1 <- abstract_symbolic {{ t == utf16_to_utf8_len xs }};
+prove_print abc thm1;*/
+
+
+
+m <- llvm_load_module "utf16_to_utf8_len.bc";
+
+let spec = do {
+  llvm_ptr "buf" (llvm_array 4 (llvm_int 8));
+  buf <- llvm_var "*buf" (llvm_array 4 (llvm_int 8));
+  len <- llvm_var "len" (llvm_int 32);
+
+  //llvm_assert_eq "len" {{ 4:[32] }};
+  llvm_assert {{ len == (4:[32]) }};
+  llvm_return {{ utf16_to_utf8_len buf }};
+  llvm_verify_tactic abc;
+};
+
+print "Verifying utf16_to_utf8_len";
+time (llvm_verify m "utf16_to_utf8_len" [] spec);

@@ -1,0 +1,1 @@
+ + s_mp_lshd() should check for overflow when computing MP_USED(mp) + p

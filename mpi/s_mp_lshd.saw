@@ -1,0 +1,115 @@
+dp <- fresh_symbolic "dp" {| [1][64] |};
+
+let allocs = [ ("mp", 1), ("mp->3", 1) ];
+let inputs = [ ("*(mp->3)", {{ dp }}, 1)
+             , ("mp->0", {{ 0:[32] }}, 1) // sign
+             , ("mp->1", {{ 1:[32] }}, 1) // alloc
+             , ("mp->2", {{ 1:[32] }}, 1) // used
+             , ("p", {{ 0:[32] }}, 1)
+             ];
+
+let outputs = [("return", 1)];
+t1 <- llvm_symexec m "s_mp_lshd" allocs inputs outputs true;
+thm1 <- abstract_symbolic {{ t1 == 0 }};
+LeftShiftByZero1 <- time (prove_print abc thm1);
+
+let inputs = [ ("*(mp->3)", {{ dp }}, 1)
+             , ("mp->0", {{ 1:[32] }}, 1) // sign
+             , ("mp->1", {{ 1:[32] }}, 1) // alloc
+             , ("mp->2", {{ 1:[32] }}, 1) // used
+             , ("p", {{ 0:[32] }}, 1)
+             ];
+t2 <- llvm_symexec m "s_mp_lshd" allocs inputs outputs true;
+thm2 <- abstract_symbolic {{ t2 == 0 }};
+LeftShiftByZero2 <- time (prove_print abc thm2);
+
+time (llvm_verify m "s_mp_lshd" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 1 (llvm_int 64));
+  p <- llvm_var "p" (llvm_int 32);
+
+  llvm_assert {{ sign < 2 }};
+  //llvm_assert_eq "mp->0" {{ 0:[32] }}; // sign
+  llvm_assert_eq "mp->1" {{ 1:[32] }}; // alloc
+  llvm_assert_eq "mp->2" {{ 1:[32] }}; // used
+  llvm_assert {{ p == 0 }};
+
+  llvm_ensure_eq "mp->0" {{ sign }};
+  llvm_ensure_eq "mp->1" {{ alloc }};
+  llvm_ensure_eq "mp->2" {{ used }};
+  llvm_ensure_eq "*(mp->3)" {{ dp }};
+
+  llvm_return {{ 0:[32] }};
+  llvm_sat_branches true;
+  //llvm_verify_tactic abc;
+
+  llvm_verify_tactic do {
+    simplify (addsimps [LeftShiftByZero1, LeftShiftByZero2]
+             (cryptol_ss ()));
+    z3;
+  };
+});
+
+/*****************************************************************************
+
+llvm_verify m "s_mp_lshd" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 1 (llvm_int 64));
+  p <- llvm_var "p" (llvm_int 32);
+
+  llvm_assert_eq "mp->0" {{ 0:[32] }}; // sign
+  llvm_assert_eq "mp->1" {{ 1:[32] }}; // alloc
+  llvm_assert_eq "mp->2" {{ 1:[32] }}; // used
+  llvm_assert_eq "*(mp->3)" {{ [0:[64]] }}; // dp
+  llvm_assert {{ p > 0 }};
+
+  llvm_ensure_eq "mp->0" {{ sign }};
+  llvm_ensure_eq "mp->1" {{ alloc }};
+  llvm_ensure_eq "mp->2" {{ used }};
+  llvm_ensure_eq "*(mp->3)" {{ dp }};
+
+  llvm_return {{ 0:[32] }};
+  llvm_sat_branches true;
+  llvm_verify_tactic abc;
+};
+
+llvm_verify m "s_mp_lshd" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 5 (llvm_int 64));
+  p <- llvm_var "p" (llvm_int 32);
+
+  llvm_assert {{ sign < 2 }};
+  llvm_assert_eq "mp->1" {{ 5:[32] }}; // alloc
+  //llvm_assert_eq "mp->2" {{ 1:[32] }}; // used
+  llvm_assert {{ used >= 1 && used <= alloc }};
+  llvm_assert {{ used + p > alloc && (p < p + used) }};
+  //llvm_assert {{ p == alloc + 1 }};
+  //llvm_assert {{ p == alloc }};
+
+  llvm_ensure_eq "mp->0" {{ sign }};
+  llvm_ensure_eq "mp->1" {{ alloc }};
+  llvm_ensure_eq "mp->2" {{ used }};
+  llvm_ensure_eq "*(mp->3)" {{ dp }};
+
+  llvm_return {{ -2:[32] }};
+  llvm_sat_branches true;
+  llvm_verify_tactic do {
+    //simplify (basic_ss
+             //(cryptol_ss ()));
+    simplify basic_ss;
+    simplify (cryptol_ss ());
+    abc;
+  };
+}; */

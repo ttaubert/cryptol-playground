@@ -1,0 +1,58 @@
+let {{
+  mp_cmp_d : {n} (fin n, n >= 64) => [n] -> [64] -> [32]
+  mp_cmp_d x d = if x > (0 # d) then 1 else if x < (0 # d) then -1 else 0
+}};
+
+log "passing a negative mp_int should yield MP_LT";
+time (llvm_verify m "mp_cmp_d" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 1 (llvm_int 64));
+  d <- llvm_var "d" (llvm_int 64);
+
+  llvm_assert_eq "a->0" {{ 1 : [32] }}; /* sign */
+  llvm_assert_eq "a->1" {{ 1 : [32] }}; /* alloc */
+  llvm_assert_eq "a->2" {{ 1 : [32] }}; /* used */
+
+  llvm_return {{ -1 : [32] }};
+  llvm_verify_tactic abc;
+});
+
+log "passing a non-negative mp_int with used > 1 should yield MP_GT";
+time (llvm_verify m "mp_cmp_d" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 2 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 2 (llvm_int 64));
+  d <- llvm_var "d" (llvm_int 64);
+
+  llvm_assert_eq "a->0" {{ 0 : [32] }}; /* sign */
+  llvm_assert_eq "a->1" {{ 2 : [32] }}; /* alloc */
+  llvm_assert_eq "a->2" {{ 2 : [32] }}; /* used */
+
+  llvm_return {{ 1 : [32] }};
+  llvm_verify_tactic abc;
+});
+
+log "verify passing a non-negative mp_int with used == 1";
+time (llvm_verify m "mp_cmp_d" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 1 (llvm_int 64));
+  d <- llvm_var "d" (llvm_int 64);
+
+  llvm_assert_eq "a->0" {{ 0 : [32] }}; /* sign */
+  llvm_assert_eq "a->1" {{ 1 : [32] }}; /* alloc */
+  llvm_assert_eq "a->2" {{ 1 : [32] }}; /* used */
+
+  llvm_return {{ mp_cmp_d (jrev dp) d }};
+  llvm_verify_tactic abc;
+});

@@ -1,0 +1,80 @@
+llvm_verify m "mp_abs" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 1 (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array 1 (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array 1 (llvm_int 64));
+
+  llvm_assert_eq "a->1" {{ 1:[32] }}; /* a.alloc */
+  llvm_assert_eq "a->2" {{ 1:[32] }}; /* a.used */
+  llvm_assert_eq "b->1" {{ 1:[32] }}; /* b.alloc */
+  llvm_assert_eq "b->2" {{ 1:[32] }}; /* b.used */
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+
+  llvm_ensure_eq "*(b->3)" {{ dp }};
+  llvm_ensure_eq "b->0" {{ 0:[32] }}; /* sign */
+  llvm_ensure_eq "b->2" {{ used }};
+
+  llvm_return {{ 0:[32] }};
+  llvm_verify_tactic abc;
+};
+
+llvm_verify m "mp_abs" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 1 (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array 2 (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array 2 (llvm_int 64));
+
+  llvm_assert_eq "a->1" {{ 1:[32] }}; /* a.alloc */
+  llvm_assert_eq "a->2" {{ 1:[32] }}; /* a.used */
+  llvm_assert_eq "b->1" {{ 2:[32] }}; /* b.alloc */
+  llvm_assert_eq "b->2" {{ 2:[32] }}; /* b.used */
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+
+  llvm_ensure_eq "*(b->3)" {{ dp # [0] }};
+  llvm_ensure_eq "b->0" {{ 0:[32] }}; /* sign */
+  llvm_ensure_eq "b->2" {{ used }};
+
+  llvm_return {{ 0:[32] }};
+  llvm_verify_tactic abc;
+};
+
+llvm_verify m "mp_abs" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 1 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 1 (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array 1 (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array 1 (llvm_int 64));
+
+  llvm_assert {{ used > alloc2 }};
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+  llvm_assert {{ alloc >= used && alloc2 >= used2 }};
+
+  llvm_return {{ -2:[32] }};
+  llvm_verify_tactic abc;
+};

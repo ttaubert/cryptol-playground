@@ -1,0 +1,19 @@
+log "verify passing an mp_int";
+time (llvm_verify m "mp_zero" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_assert {{ sign < 2 }};
+  llvm_assert_eq "mp->1" {{ 5 : [32] }}; /* alloc */
+  llvm_assert {{ used > 0 && used <= alloc }};
+
+  llvm_ensure_eq "*(mp->3)" {{ [0, 0, 0, 0, 0 : [64]] }};
+  llvm_ensure_eq "mp->0" {{ 0 : [32] }}; /* sign */
+  llvm_ensure_eq "mp->2" {{ 1 : [32] }}; /* used */
+
+  llvm_verify_tactic abc;
+});

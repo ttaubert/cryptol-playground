@@ -1,0 +1,79 @@
+let {{
+  mp_cmp_mag : {n} (fin n, n >= 64) => [n] -> [n] -> [32]
+  mp_cmp_mag x y = if x > y then 1 else if x < y then -1 else 0
+}};
+
+log "verify passing mp_ints where a.used <> b.used";
+time (llvm_verify m "mp_cmp_mag" [] do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array 5 (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array 5 (llvm_int 64));
+
+  // TODO https://github.com/GaloisInc/saw-script/issues/121
+  // Ideally, we'd like to check all instances where a.used != b.used but
+  // that's currently too slow (or doesn't finish). So currently we have to
+  // fix a.used to let SAW terminate when verifying the while loop.
+
+  llvm_assert_eq "a->1" {{ 5 : [32] }}; /* a.alloc */
+  llvm_assert_eq "a->2" {{ 3 : [32] }}; /* a.used */
+  llvm_assert_eq "b->1" {{ 5 : [32] }}; /* b.alloc */
+  llvm_assert {{ used2 > 0 && used2 <= alloc2 && used2 != used }};
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+
+  llvm_sat_branches true;
+  llvm_return {{ (if used < used2 then -1 else 1) : [32] }};
+  llvm_verify_tactic abc;
+});
+
+let SpecWithEqualUsed num = do {
+  llvm_ptr "a" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "a->0" (llvm_int 32);
+  alloc <- llvm_var "a->1" (llvm_int 32);
+  used <- llvm_var "a->2" (llvm_int 32);
+  llvm_ptr "a->3" (llvm_array num (llvm_int 64));
+  dp <- llvm_var "*(a->3)" (llvm_array num (llvm_int 64));
+
+  llvm_ptr "b" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "b->0" (llvm_int 32);
+  alloc2 <- llvm_var "b->1" (llvm_int 32);
+  used2 <- llvm_var "b->2" (llvm_int 32);
+  llvm_ptr "b->3" (llvm_array num (llvm_int 64));
+  dp2 <- llvm_var "*(b->3)" (llvm_array num (llvm_int 64));
+
+  // TODO https://github.com/GaloisInc/saw-script/issues/121
+  // Ideally, we'd like to check all instances where a.used == b.used but
+  // that's currently too slow (or doesn't finish). So currently we have to
+  // fix a.used to let SAW terminate when verifying the while loop.
+
+  llvm_assert_eq "a->1" {{ `num : [32] }}; /* a.alloc */
+  llvm_assert_eq "a->2" {{ `num : [32] }}; /* a.used */
+  llvm_assert_eq "b->1" {{ `num : [32] }}; /* b.alloc */
+  llvm_assert_eq "b->2" {{ `num : [32] }}; /* b.used */
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+
+  llvm_sat_branches true;
+  llvm_return {{ mp_cmp_mag (jrev dp) (jrev dp2) }};
+  llvm_verify_tactic abc;
+};
+
+log "verify passing mp_ints where a.used == b.used == 1";
+time (llvm_verify m "mp_cmp_mag" [] (SpecWithEqualUsed 1));
+
+log "verify passing mp_ints where a.used == b.used == 4";
+time (llvm_verify m "mp_cmp_mag" [] (SpecWithEqualUsed 4));
+
+log "verify passing mp_ints where a.used == b.used == 5";
+time (llvm_verify m "mp_cmp_mag" [] (SpecWithEqualUsed 5));
+
+log "verify passing mp_ints where a.used == b.used == 8";
+time (llvm_verify m "mp_cmp_mag" [] (SpecWithEqualUsed 8));

@@ -1,0 +1,75 @@
+let {{
+  s_mp_pad : {n} (fin n, n >= 1) => [n][64] -> [32] -> [32] -> [n][64]
+  s_mp_pad xs u m = (ys ! 0).0
+      where ys = [(xs, 1)] # [ next x y | x <- xs | y <- ys ]
+            next x y = ((tail y.0) # [item], y.1 + 1)
+                where item = if y.1 > u && y.1 <= m then 0 else x
+}};
+
+llvm_verify m "s_mp_pad" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 5 (llvm_int 64));
+  min <- llvm_var "min" (llvm_int 32);
+
+  llvm_assert {{ sign < 2 }};
+  llvm_assert_eq "mp->1" {{ 5:[32] }}; /* alloc */
+  llvm_assert {{ used <= alloc }};
+  llvm_assert {{ min <= used }};
+
+  llvm_ensure_eq "mp->0" {{ sign }};
+  llvm_ensure_eq "mp->1" {{ alloc }};
+  llvm_ensure_eq "mp->2" {{ max min used }};
+  llvm_ensure_eq "*(mp->3)" {{ dp }};
+
+  llvm_sat_branches true;
+  llvm_return {{ 0:[32] }};
+  llvm_verify_tactic abc;
+};
+
+llvm_verify m "s_mp_pad" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 5 (llvm_int 64));
+  min <- llvm_var "min" (llvm_int 32);
+
+  llvm_assert {{ sign < 2 }};
+  llvm_assert_eq "mp->1" {{ 5:[32] }}; /* alloc */
+  llvm_assert {{ used <= alloc }};
+  llvm_assert {{ min > alloc }};
+
+  llvm_sat_branches true;
+  llvm_return {{ -2:[32] }};
+  llvm_verify_tactic abc;
+};
+
+llvm_verify m "s_mp_pad" [] do {
+  llvm_ptr "mp" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "mp->0" (llvm_int 32);
+  alloc <- llvm_var "mp->1" (llvm_int 32);
+  used <- llvm_var "mp->2" (llvm_int 32);
+  llvm_ptr "mp->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(mp->3)" (llvm_array 5 (llvm_int 64));
+  min <- llvm_var "min" (llvm_int 32);
+
+  llvm_assert {{ sign < 2 }};
+  llvm_assert_eq "mp->1" {{ 5:[32] }}; /* alloc */
+  llvm_assert {{ used <= alloc }};
+  llvm_assert {{ min <= alloc }};
+  llvm_assert {{ min > used }};
+
+  llvm_ensure_eq "mp->0" {{ sign }};
+  llvm_ensure_eq "mp->1" {{ alloc }};
+  llvm_ensure_eq "mp->2" {{ min }};
+  llvm_ensure_eq "*(mp->3)" {{ s_mp_pad dp used min }};
+
+  llvm_sat_branches true;
+  llvm_return {{ 0:[32] }};
+  llvm_verify_tactic abc;
+};

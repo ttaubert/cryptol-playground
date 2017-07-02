@@ -1,0 +1,86 @@
+// Properties:
+// returns 0xFFFFFFFFFFFFFFFF if x >= (1 << 63)
+//         0x0000000000000000 otherwise
+msb : [64] -> [64]
+msb x = if x >= (1 << 63) then -1 else 0
+
+property p_msb = msb 0 == 0 && msb 1 == 0 &&
+                 msb (-1) == 0xFFFFFFFFFFFFFFFF &&
+                 msb (-2) == 0xFFFFFFFFFFFFFFFF
+
+// Properties:
+// returns 0xFFFFFFFFFFFFFFFF if x == 0
+//         0x0000000000000000 otherwise
+eq_z : [64] -> [64]
+eq_z x = if x == 0 then -1 else 0
+
+property p_eq_z = eq_z 1 == 0 &&
+                  eq_z 0 == 0xFFFFFFFFFFFFFFFF
+
+// Properties:
+// returns 0xFFFFFFFFFFFFFFFF if a < b
+//         0x0000000000000000 otherwise
+lt : [64] -> [64] -> [64]
+lt a b = if a < b then -1 else 0
+
+property p_lt = lt 0 0 == 0 && lt 1 0 == 0 &&
+                lt (-1) 0 == 0 && lt (-1) (-1) == 0 &&
+                lt 0 1 == 0xFFFFFFFFFFFFFFFF &&
+                lt 0 (-1) == 0xFFFFFFFFFFFFFFFF &&
+                lt (-2) (-1) == 0xFFFFFFFFFFFFFFFF
+
+// Properties:
+//    (*carryOut << 64) + out == a + b + (carryIn & 1)
+//    carryOut == 0 or 1
+//    returns MP_BADARG if carryIn != 0 or 1
+u64_add : [64] -> [64] -> [64] -> ([64], [64])
+u64_add a b c = (out, carry)
+    where sum = pad a + pad b + pad c
+          carry = drop`{1} (sum >> 64)
+          out = drop`{1} sum
+          pad x = 0 # x
+
+property p_u64_add = u64_add 0 0 0 == (0, 0) &&
+                     u64_add 0 0 1 == (1, 0) &&
+                     u64_add 1 0 0 == (1, 0) &&
+                     u64_add (1 << 63) (1 << 63) 0 == (0, 1) &&
+                     u64_add (1 << 63) (1 << 63) 1 == (1, 1) &&
+                     u64_add (-1) (-1) 0 == (-2, 1) &&
+                     u64_add (-1) (-1) 1 == (-1, 1)
+
+// Properties:
+//    (*carryOut << 64) + a - b - carryIn = out
+//    carryOut == 0 or 1
+//    returns MP_BADARG if carryIn != 0 or 1
+u64_sub : [64] -> [64] -> [64] -> ([64], [64])
+u64_sub a b c = (a - b -c, carry)
+    where carry = if b + c > a then 1 else 0
+
+property p_u64_sub = u64_sub 0 0 0 == (0, 0) &&
+                     u64_sub 1 0 0 == (1, 0) &&
+                     u64_sub 1 1 0 == (0, 0) &&
+                     u64_sub 0 1 0 == (-1, 1) &&
+                     u64_sub (-1) (-1) 0 == (0, 0) &&
+                     u64_sub (-1) (-2) 0 == (1, 0) &&
+                     u64_sub (-1) (-2) 1 == (0, 0) &&
+                     u64_sub 1 (-1) 0 == (2, 1)
+
+// Property: (hi << 64) + lo = a * b
+u64_mul : [64] -> [64] -> ([64], [64])
+u64_mul a b = (take`{64} prod, drop`{64} prod)
+    where prod = (pad a) * (pad b)
+          pad x = 0 # x
+
+property p_u64_mul = u64_mul 0 0 == (0, 0) &&
+                     u64_mul 1 0 == (0, 0) &&
+                     u64_mul 2 3 == (0, 6) &&
+                     u64_mul (-1) (-1) == (-2, 1) &&
+                     u64_mul (-1) (-2) == (-3, 2)
+
+u64_square : [64] -> ([64], [64])
+u64_square x = (take`{64} prod, drop`{64} prod)
+    where prod = (0 # x) ^^ 2
+
+property p_u64_square = u64_square 0 == (0, 0) &&
+                        u64_square 1 == (0, 1) &&
+                        u64_square 5 == (0, 25)

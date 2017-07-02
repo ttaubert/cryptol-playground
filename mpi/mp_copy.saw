@@ -1,0 +1,83 @@
+let {{
+  s_mp_setz : {n} (fin n, n >= 1) => [n][64] -> [32] -> [n][64]
+  s_mp_setz xs u = (ys ! 0).0
+      where ys = [(xs, u)] # [ step zs v | _ <- xs | (zs, v) <- ys ]
+            step zs v = (drop`{1} zs # next, if v > 0 then v - 1 else 0)
+                where next = if v > 0 then take`{1} zs else [0]
+}};
+
+log "passing mp_ints with to.alloc < from.used should yield MP_MEM";
+time (llvm_verify m "mp_copy" [] do {
+  llvm_ptr "from" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "from->0" (llvm_int 32);
+  alloc <- llvm_var "from->1" (llvm_int 32);
+  used <- llvm_var "from->2" (llvm_int 32);
+  llvm_ptr "from->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(from->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_ptr "to" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "to->0" (llvm_int 32);
+  alloc2 <- llvm_var "to->1" (llvm_int 32);
+  used2 <- llvm_var "to->2" (llvm_int 32);
+  llvm_ptr "to->3" (llvm_array 5 (llvm_int 64));
+  dp2 <- llvm_var "*(to->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+  llvm_assert_eq "from->1" {{ 5 : [32] }}; /* from.alloc */
+  llvm_assert {{ used > 0 && used <= alloc && used > alloc2 }};
+  llvm_assert_eq "to->1" {{ 5 : [32] }}; /* to.alloc */
+  llvm_assert {{ used2 > 0 && used2 <= alloc2 }};
+
+  // TODO https://github.com/GaloisInc/saw-script/issues/130
+  // llvm_ensure_eq "*(to->3)" {{ dp2 }};
+
+  llvm_ensure_eq "to->0" {{ sign2 }};
+  llvm_ensure_eq "to->1" {{ alloc2 }};
+  llvm_ensure_eq "to->2" {{ used2 }};
+
+  llvm_ensure_eq "from->0" {{ sign }};
+  llvm_ensure_eq "from->1" {{ alloc }};
+  llvm_ensure_eq "from->2" {{ used }};
+  llvm_ensure_eq "*(from->3)" {{ dp }};
+
+  llvm_return {{ -2 : [32] }};
+  llvm_verify_tactic abc;
+});
+
+log "verify passing mp_ints with to.alloc >= from.used";
+time (llvm_verify m "mp_copy" [] do {
+  llvm_ptr "from" (llvm_struct "struct.mp_int");
+  sign <- llvm_var "from->0" (llvm_int 32);
+  alloc <- llvm_var "from->1" (llvm_int 32);
+  used <- llvm_var "from->2" (llvm_int 32);
+  llvm_ptr "from->3" (llvm_array 5 (llvm_int 64));
+  dp <- llvm_var "*(from->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_ptr "to" (llvm_struct "struct.mp_int");
+  sign2 <- llvm_var "to->0" (llvm_int 32);
+  alloc2 <- llvm_var "to->1" (llvm_int 32);
+  used2 <- llvm_var "to->2" (llvm_int 32);
+  llvm_ptr "to->3" (llvm_array 5 (llvm_int 64));
+  dp2 <- llvm_var "*(to->3)" (llvm_array 5 (llvm_int 64));
+
+  llvm_assert {{ sign < 2 && sign2 < 2 }};
+  llvm_assert_eq "from->1" {{ 5 : [32] }}; /* from.alloc */
+  llvm_assert {{ used > 0 && used <= alloc && used <= alloc2 }};
+  llvm_assert_eq "to->1" {{ 5 : [32] }}; /* to.alloc */
+  llvm_assert {{ used2 > 0 && used2 <= alloc2 }};
+
+  // TODO https://github.com/GaloisInc/saw-script/issues/130
+  // llvm_ensure_eq "*(to->3)" {{ s_mp_setz dp used }};
+
+  llvm_ensure_eq "to->0" {{ sign }};
+  llvm_ensure_eq "to->1" {{ alloc2 }};
+  llvm_ensure_eq "to->2" {{ used }};
+
+  llvm_ensure_eq "from->0" {{ sign }};
+  llvm_ensure_eq "from->1" {{ alloc }};
+  llvm_ensure_eq "from->2" {{ used }};
+  llvm_ensure_eq "*(from->3)" {{ dp }};
+
+  llvm_return {{ 0 : [32] }};
+  llvm_verify_tactic abc;
+});

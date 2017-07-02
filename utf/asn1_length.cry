@@ -1,0 +1,135 @@
+/* Pad a given number to 32 bits. */
+uint32_pad : {n,m} (fin n, m == 32 - n) => [n] -> [32]
+uint32_pad x = join (pre # split x)
+    where pre = split`{each=1} (0:[m])
+
+/* TODO */
+asn1_item_length : {n} (fin n, n >= 1) => [n][8] -> [32]
+asn1_item_length xs = tag_len + asn1_value_length (xs << tag_len, cons)
+    where cons = ((xs @ 0) && 0x20) == 0x20
+          tag_len = asn1_tag_length xs
+
+/* Determine the byte length of a tag. */
+asn1_tag_length : {n} (fin n, n >= 1) => [n][8] -> [32]
+asn1_tag_length xs = if tagno != 0x1f then 1 else asn1_hi_tag_length xs
+    where tagno = (xs @ 0) && 0x1f
+
+/* Determine the byte length of a tag in high-tag-number form. */
+asn1_hi_tag_length : {n} (fin n, n >= 1) => [n][8] -> [32]
+asn1_hi_tag_length xs = if res.1 then res.0 else 0
+    where ys = [(1, False)] # [ step (y, x) | x <- drop`{1} xs | y <- ys ]
+          step ((c, f), x) = (if f then c else c + 1, f || is_end x)
+          is_end x = (x && 0x80) == 0
+          res = ys ! 0
+
+/* TODO */
+asn1_value_length : {n} (fin n, n >= 1) => ([n][8], Bit) -> [32]
+asn1_value_length (xs, cons) = asn1_length_length xs + contents_len
+    where contents_len = asn1_contents_length (xs, cons)
+
+/* Determine the byte length of the length header. */
+asn1_length_length : {n} (fin n, n >= 1) => [n][8] -> [32]
+asn1_length_length xs = uint32_pad (if is_short then 1 else long)
+    where long = if num_bytes > 4 then 0 else num_bytes + 1
+          is_short = first == num_bytes
+          num_bytes = first && 0x7f
+          first = xs @ 0
+
+/* TODO */
+asn1_contents_length : {n} (fin n, n >= 1) => ([n][8], Bit) -> [32]
+asn1_contents_length (xs, cons) = if is_short then uint32_pad nb
+                                  /* Return if too long for 32 bits. */
+                                  else if nb > 4 then 0
+                                  /* Constructed, indefinite-length value. */
+                                  else if indef then asn1_indef_contents_length xs
+                                  /* Long form. */
+                                  else asn1_long_contents_length (xs, nb)
+    where indef = cons && (nb == 0)
+          is_short = first == nb
+          nb = first && 0x7f
+          first = xs @ 0
+
+/* TODO */
+asn1_long_contents_length : {n} (fin n, n >= 1) => ([n][8], [8]) -> [32]
+asn1_long_contents_length (xs, nb) = if res.count == nb then res.len else 0
+    where ys = [init] # [ step (y, uint32_pad x) | x <- drop`{1} xs | y <- ys ]
+          step (y, x) = {count=y.count + 1, len=(y.len << 8) || x}
+          init = {count=0, len=0}
+          res = ys ! 0
+
+// TODO handle rotation overflows whenever shifting
+
+/* Determine the byte length of indefinite-length content. */
+asn1_indef_contents_length : {n} (fin n, n >= 1) => [n][8] -> [32]
+asn1_indef_contents_length xs = if res.eof then res.count else 0
+    where res = ys ! 0
+          ys = [init] # [ step y | x <- drop`{1} xs | y <- ys ]
+          init = {count=0, wait=0, lastz=False, eof=False, xs=xs << 1}
+          step y = /* If we found EOF already, iterate until xs is empty. */
+                   if y.eof then {count=y.count, wait=0, lastz=False, eof=True, xs=y.xs}
+                   /* If wait > 0 then shift xs' until after the inner item. */
+                   else if y.wait > 0 then {count=y.count + 1, wait=y.wait - 1, lastz=False, eof=False, xs=y.xs << 1}
+                   /* If we found the second 00 of 00 00 then EOF=true. */
+                   else if y.lastz && (y.xs @ 0) == 0 then {count=y.count + 1, wait=0, lastz=False, eof=True, xs=y.xs}
+                   /* If we found a 00, it might be the first of 00 00. */
+                   else if ~y.lastz && (y.xs @ 0) == 0 then {count=y.count + 1, wait=0, lastz=True, eof=False, xs=y.xs << 1}
+                   /* TODO */
+                   else if y.lastz then {count=y.count + 1, wait=asn1_value_length (y.xs, False) - 1, lastz=False, eof=False, xs=y.xs << 1}
+                   /* TODO */
+                   else {count=y.count + 1, wait=asn1_item_length y.xs - 1, lastz=False, eof=False, xs=y.xs << 1}
+
+/*** TESTS *******************************************************************/
+
+property p_uint32_pad = (uint32_pad 0xa == 0x0000000a) &&
+                        (uint32_pad 0xab == 0x000000ab) &&
+                        (uint32_pad 0xabcd == 0x0000abcd) &&
+                        (uint32_pad 0x89abcdef == 0x89abcdef)
+
+property p_asn1_item_length = (asn1_item_length [0x02, 0x01, 0x01] == 3) &&
+                              (asn1_item_length [0x02, 0x01] == 3)
+
+property p_asn1_tag_length1 = [ asn1_tag_length [x] == y | (x, y) <- vs ] == ~zero
+    where vs = [(0x01, 1), (0x05, 1), (0x0f, 1), (0x1f, 0)]
+property p_asn1_tag_length2 = [ asn1_tag_length x == y | (x, y) <- vs ] == ~zero
+    where vs = [([0x1f, 0xff, 0x81, 0x7f], 4),
+                ([0x1f, 0x7f, 0x81, 0x7f], 2),
+                ([0x1f, 0xff, 0xff, 0xff], 0)]
+
+property p_asn1_length_length =
+    (asn1_length_length [0x01] == 0x00000001) &&
+    (asn1_length_length [0x7f] == 0x00000001) &&
+    (asn1_length_length [0x80] == 0x00000001) &&
+    (asn1_length_length [0x81] == 0x00000002) &&
+    (asn1_length_length [0x84] == 0x00000005) &&
+    (asn1_length_length [0x85] == 0)
+
+// TODO add tests with cons=true?
+property p_asn1_contents_length =
+    (asn1_contents_length ([0x01], False) == 0x00000001) &&
+    (asn1_contents_length ([0x7f], False) == 0x0000007f) &&
+    (asn1_contents_length ([0x80], False) == 0) &&
+    (asn1_contents_length ([0x81, 0x01], False) == 0x00000001) &&
+    (asn1_contents_length ([0x84, 0x01, 0x02, 0x03, 0x04], False) == 0x01020304) &&
+    (asn1_contents_length ([0x84, 0x01, 0x02, 0x03], False) == 0) &&
+    (asn1_contents_length ([0x85, 0x01, 0x02, 0x03, 0x04, 0x05], False) == 0)
+
+property p_asn1_indef_contents_length =
+    /* Proper zero-length content. SEQUENCE[] */
+    (asn1_indef_contents_length [0x80, 0x00, 0x00] == 2) &&
+    /* Invalid encoding. */
+    (asn1_indef_contents_length [0x80, 0x00] == 0) &&
+    (asn1_indef_contents_length [0x80] == 0) &&
+    /* SEQUENCE[INT(1)] */
+    (asn1_indef_contents_length [0x80, 0x02, 0x01, 0x01, 0x00, 0x00] == 5) &&
+    (asn1_indef_contents_length [0x80, 0x02, 0x01, 0x00, 0x00] == 0) &&
+    (asn1_indef_contents_length [0x80, 0x02, 0x01, 0x01, 0x00] == 0) &&
+    /* SEQUENCE[ZERO(1)] */
+    (asn1_indef_contents_length [0x80, 0x00, 0x01, 0x00, 0x00, 0x00] == 5) &&
+    (asn1_indef_contents_length [0x80, 0x00, 0x02, 0x00, 0x00, 0x00] == 0) &&
+    /* SEQUENCE[SEQUENCE[]] */
+    (asn1_indef_contents_length [0x80, 0x30, 0x80, 0x00, 0x00, 0x00, 0x00] == 6) &&
+    (asn1_indef_contents_length [0x80, 0x30, 0x80, 0x00, 0x00, 0x00] == 0) &&
+    /* SEQUENCE[SEQUENCE[INT(1)]] */
+    (asn1_indef_contents_length [0x80, 0x30, 0x80, 0x02, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00] == 9) &&
+    /* SEQUENCE[SEQUENCE[INT(1)], INT(1)] */
+    (asn1_indef_contents_length [0x80, 0x30, 0x80, 0x02, 0x01, 0x05, 0x00, 0x00, 0x02, 0x01, 0x05, 0x00, 0x00] == 12)

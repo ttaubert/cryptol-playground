@@ -1,0 +1,16 @@
+import "asn1_int.cry";
+
+print "Extracting reference term";
+l <- llvm_load_module "asn1_int.bc";
+
+xs <- fresh_symbolic "xs" {| [2][8] |};
+let allocs = [ ("buf", 2) ];
+let inputs = [ ("*buf", xs, 2)
+             , ("len", {{ 2:[32] }}, 1)
+             ];
+
+let outputs = [("return", 1)];
+t <- llvm_symexec l "asn1_int" allocs inputs outputs true;
+
+thm1 <- abstract_symbolic {{ t == asn1_int xs }};
+prove_print abc thm1;

@@ -1,0 +1,33 @@
+m <- llvm_load_module "mpi.bc";
+
+let log msg = do {
+  print "";
+  print msg;
+};
+
+let {{
+  jrev xs = join (reverse xs)
+}};
+
+// Comparisons
+include "mp_cmp_z.saw";
+include "mp_cmp_d.saw";
+// include "mp_cmp.saw";
+// include "mp_cmp_mag.saw";
+include "mp_isodd.saw";
+include "mp_iseven.saw";
+
+// Memory management
+include "mp_copy.saw";
+include "mp_zero.saw";
+
+// Sign manipulations
+include "mp_abs.saw";
+// include "mp_neg.saw";
+//
+// Internal
+// include "s_mp_clamp.saw";
+// include "s_mp_exch.saw";
+// include "s_mp_rshd.saw";
+// include "s_mp_lshd.saw";
+// include "s_mp_pad.saw";
