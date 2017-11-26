@@ -1,0 +1,528 @@
+m <- llvm_load_module "bmul32.bc";
+
+let {{
+  bmul32 : [32] -> [32] -> ([32], [32])
+  bmul32 a b = (take`{32} prod, drop`{32} prod)
+      where prod = pad (pmult a b)
+            pad x = zero # x
+
+  bmul32' : [32] -> [32] -> [64]
+  bmul32' a b = prod
+      where prod = pad (pmult a b)
+            pad x = zero # x
+
+  bmul : [32] -> [32] -> [33]([64], [64], [64])
+  bmul a b = take`{33} rs
+      where rs = [init] # [ (r ^ (f a' b'), a' << 1, b' >> 1) | (r, a', b') <- rs ]
+            f : [64] -> [64] -> [64]
+            f a' b' = if (b' && 1) == 1 then a' else zero
+            init = (zero, pad a, pad b)
+            pad : [32] -> [64]
+            pad x = zero # x
+
+  bmulr a b = ((bmul a b) @ 32).0
+
+  bmulc : [32] -> [32] -> [64]
+  bmulc x y = z0' || z1' || z2' || z3'
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z0 = (x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)
+            z1 = (x0 * y1) ^ (x1 * y0) ^ (x2 * y3) ^ (x3 * y2)
+            z2 = (x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y3)
+            z3 = (x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0)
+            z0' = z0 && 0x1111111111111111
+            z1' = z1 && 0x2222222222222222
+            z2' = z2 && 0x4444444444444444
+            z3' = z3 && 0x8888888888888888
+            pad : [32] -> [64]
+            pad x' = zero # x'
+
+  bmulc0 : [32] -> [32] -> [64]
+  bmulc0 x y = z0 && 0x1111111111111111
+      where x0 = (pad x) && 0x1111111111111111
+            x1 = (pad x) && 0x2222222222222222
+            x2 = (pad x) && 0x4444444444444444
+            x3 = (pad x) && 0x8888888888888888
+            y0 = (pad y) && 0x1111111111111111
+            y1 = (pad y) && 0x2222222222222222
+            y2 = (pad y) && 0x4444444444444444
+            y3 = (pad y) && 0x8888888888888888
+            z0 = (x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)
+            pad : [32] -> [64]
+            pad x' = zero # x'
+
+  bmulc1 : [32] -> [32] -> [64]
+  bmulc1 x y = z1 && 0x2222222222222222
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z1 = (x0 * y1) ^ (x1 * y0) ^ (x2 * y3) ^ (x3 * y2)
+            pad : [32] -> [64]
+            pad x' = zero # x'
+
+  bmulc2 : [32] -> [32] -> [64]
+  bmulc2 x y = z2 && 0x4444444444444444
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z2 = (x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y3)
+            pad : [32] -> [64]
+            pad x' = zero # x'
+
+  bmulc3 : [32] -> [32] -> [64]
+  bmulc3 x y = z3 && 0x8888888888888888
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z3 = (x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0)
+            pad : [32] -> [64]
+            pad x' = zero # x'
+
+  bmulc_all : [32] -> [32] -> [64]
+  bmulc_all x y = (bmulc0 x y) ^ (bmulc1 x y) ^ (bmulc2 x y) ^ (bmulc3 x y)
+
+  pmult0 : [32] -> [32] -> [64]
+  pmult0 x y = (zero # (pmult x y)) && 0x1111111111111111
+
+  pmult1 : [32] -> [32] -> [64]
+  pmult1 x y = (zero # (pmult x y)) && 0x2222222222222222
+
+  pmult2 : [32] -> [32] -> [64]
+  pmult2 x y = (zero # (pmult x y)) && 0x4444444444444444
+
+  pmult3 : [32] -> [32] -> [64]
+  pmult3 x y = (zero # (pmult x y)) && 0x8888888888888888
+
+  pmult_all : [32] -> [32] -> [64]
+  pmult_all x y = (pmult0 x y) ^ (pmult1 x y) ^ (pmult2 x y) ^ (pmult3 x y)
+}};
+
+/*let simpset x = addsimps x empty_ss;
+
+r0 <- time (prove_print abc {{ \x y -> bmulc0 x y == pmult0 x y }});
+r1 <- time (prove_print abc {{ \x y -> bmulc1 x y == pmult1 x y }});
+r2 <- time (prove_print abc {{ \x y -> bmulc2 x y == pmult2 x y }});
+r3 <- time (prove_print abc {{ \x y -> bmulc3 x y == pmult3 x y }});
+
+r4 <- time (prove_print abc {{ \x y -> (bmulc0 x y) ^ (bmulc1 x y) ^ (bmulc2 x y) ^ (bmulc3 x y) == bmulc_all x y }});
+r5 <- time (prove_print abc {{ \x y -> (pmult0 x y) ^ (pmult1 x y) ^ (pmult2 x y) ^ (pmult3 x y) == pmult_all x y }});
+r6 <- time (prove_print abc {{ \x y -> bmulc_all x y == (bmulc0 x y) ^ (bmulc1 x y) ^ (bmulc2 x y) ^ (bmulc3 x y) }});
+r7 <- time (prove_print abc {{ \x y -> pmult_all x y == (pmult0 x y) ^ (pmult1 x y) ^ (pmult2 x y) ^ (pmult3 x y) }});
+
+let ss = simpset [r0, r1, r2, r3, r4, r5];
+
+print "1st one";
+f1 <- time (prove_print do { simplify ss; abc; } {{ \x y -> (bmulc0 x y) ^ (bmulc1 x y) ^ (bmulc2 x y) ^ (bmulc3 x y) == (pmult0 x y) ^ (pmult1 x y) ^ (pmult2 x y) ^ (pmult3 x y) }});
+
+let ss2 = simpset [r6, r7, f1];
+
+print "2nd one";
+f2 <- time (prove_print do { simplify ss2; abc; } {{ \x y -> bmulc_all x y == pmult_all x y }});
+f2' <- time (prove_print do { simplify ss2; abc; } {{ \x y -> pmult_all x y == bmulc_all x y }});
+
+print "3rd one";
+bmul32_ret <- llvm_extract m "bmul32_ret" llvm_pure;
+f3 <- time (prove_print abc {{ \x y -> bmulc_all x y == bmul32_ret x y }});
+f4 <- time (prove_print abc {{ \x y -> bmul32_ret x y == bmulc_all x y }});
+
+let ss3 = simpset [f2', f3, f4];
+
+print "4th one";
+f5 <- time (prove_print do { simplify ss3; abc; } {{ \x y -> pmult_all x y == bmul32_ret x y }});*/
+
+
+//time (prove_print abc {{ \x y -> bmulr x y == bmul32' x y }});
+//time (prove_print abc {{ \x y -> bmulc x y == bmul32' x y }});
+//time (prove_print abc {{ \x y -> bmulc x y == bmulr x y }});
+
+//time (prove_print abc {{ \x y -> bmulc0 x y == ((bmulr x y) && 0x1111111111111111) }});
+//time (prove_print abc {{ \x y -> bmulc0 x y == ((bmul32' x y) && 0x1111111111111111) }});
+//time (prove_print abc {{ \x y -> bmulc0 x y == ((zero # (pmult x y)) && 0x1111111111111111) }});
+//time (prove_print abc {{ \x y -> bmulc0 x y == pmult0 x y }});
+
+//time (prove_print abc {{ \x y -> pmult0 x y == ((zero # (pmult x y)) && 0x1111111111111111) }});
+//time (prove_print abc {{ \x y -> pmult_all x y == bmulr x y }});
+//time (prove_print abc {{ \x y -> pmult_all x y == bmul32' x y }});
+
+//time (prove_print abc {{ \x y -> pmult_all x y == bmulc x y }});
+
+
+//time (prove_print abc {{ \x y -> bmulc_all x y == bmulc x y }});
+
+/*time (prove_print abc {{ \x y -> bmulc0 x y == pmult0 x y }});
+time (prove_print abc {{ \x y -> bmulc1 x y == pmult1 x y }});
+time (prove_print abc {{ \x y -> bmulc2 x y == pmult2 x y }});
+time (prove_print abc {{ \x y -> bmulc3 x y == pmult3 x y }});
+time (prove_print abc {{ \x y -> bmulc_all x y == pmult_all x y }});*/
+
+/*r0 <- prove abc {{ \x y -> bmulc0 x y == pmult0 x y }};
+r1 <- prove abc {{ \x y -> bmulc1 x y == pmult1 x y }};
+r2 <- prove abc {{ \x y -> bmulc2 x y == pmult2 x y }};
+r3 <- prove abc {{ \x y -> bmulc3 x y == pmult3 x y }};*/
+
+
+
+bmul32_ret <- llvm_extract m "bmul32_ret" llvm_pure;
+//time (prove_print abc {{ \x y -> bmulc0 x y == pmult0 x y }});
+//time (prove_print abc {{ \x y -> bmulr x y == bmul32_ret x y }});
+
+
+
+let {{
+  pad x = zero # x
+
+  mask0_pad x = mask0 (pad x)
+  mask0 x = x && 0x1111111111111111
+
+  mask1_pad x = mask1 (pad x)
+  mask1 x = x && 0x2222222222222222
+
+  mul0 : [32] -> [32] -> [64]
+  mul0 x y = mask0 ((mask0_pad x) * (mask0_pad y))
+
+  mul1 : [32] -> [32] -> [64]
+  mul1 x y = mask1 ((mask1_pad x) * (mask1_pad y))
+
+  pmul0 x y = mask0 (pad (pmult x y))
+
+  bmulr0 : [32] -> [32] -> [64]
+  bmulr0 a b = mask0 ((take`{9} rs) @ 8).0
+      where rs = [init] # [ (r ^ (f a' b'), a' << 4, b' >> 4) | (r, a', b') <- rs ]
+            f : [64] -> [64] -> [64]
+            f a' b' = if (b' && 1) == 1 then a' else zero
+            init = (zero, pad a, pad b)
+
+  bmulr1 : [32] -> [32] -> [64]
+  bmulr1 a b = mask1 ((take`{9} rs) @ 8).0
+      where rs = [init] # [ (r ^ (f a' b'), a' << 4, b' >> 4) | (r, a', b') <- rs ]
+            f : [64] -> [64] -> [64]
+            f a' b' = if (b' && 2) == 2 then a' else zero
+            init = (zero, pad a, pad b)
+}};
+
+/*print {{ mul0 256 536870912 }};
+print {{ bmulr0 256 536870912 }};
+print {{ mul1 32 536870912 }};
+print {{ bmulr1 32 536870912 }};*/
+
+//time (prove_print abc {{ \x y -> mul0 x y == bmulr0 x y }});
+//time (prove_print abc {{ \x y -> mul1 x y == bmulr1 x y }});
+//time (prove_print abc {{ \x y -> mul0 x y == pmul0 x y }});
+
+
+
+let {{
+  pad x = zero # x
+
+  mask0_pad x = mask0 (pad x)
+  mask0 x = x && 0x1111111111111111
+
+  mask1_pad x = mask1 (pad x)
+  mask1 x = x && 0x2222222222222222
+
+  mask2_pad x = mask2 (pad x)
+  mask2 x = x && 0x4444444444444444
+
+  mask3_pad x = mask3 (pad x)
+  mask3 x = x && 0x8888888888888888
+
+  mul_x0_y0 : [32] -> [32] -> [64]
+  mul_x0_y0 x y = mask0 ((mask0_pad x) * (mask0_pad y))
+
+  mul_x1_y3 : [32] -> [32] -> [64]
+  mul_x1_y3 x y = mask0 ((mask1_pad x) * (mask3_pad y))
+
+  mul_x3_y1 : [32] -> [32] -> [64]
+  mul_x3_y1 x y = mask0 ((mask3_pad x) * (mask1_pad y))
+
+  mul_x2_y2 : [32] -> [32] -> [64]
+  mul_x2_y2 x y = mask0 ((mask2_pad x) * (mask2_pad y))
+
+  mul0 : [32] -> [32] -> [64]
+  mul0 x y = (mul_x0_y0 x y) ^ (mul_x1_y3 x y) ^ (mul_x2_y2 x y) ^ (mul_x3_y1 x y)
+
+  mul0' : [32] -> [32] -> [64]
+  mul0' x y = (mul_x0_y0 x y) ^ ((mul_x0_y0 (x >> 1) (y >> 3)) << 4) ^ ((mul_x0_y0 (x >> 2) (y >> 2)) << 4) ^ ((mul_x0_y0 (x >> 3) (y >> 1)) << 4)
+
+  mul0'' : [32] -> [32] -> [64]
+  mul0'' x y = mask0 ((x0 * y0) ^ ((x1 * y3) << 4) ^ ((x2 * y2) << 4) ^ ((x3 * y1) << 4))
+      where x0 = mask0_pad x
+            y0 = mask0_pad y
+            x1 = mask0_pad (x >> 1)
+            y1 = mask0_pad (y >> 1)
+            x2 = mask0_pad (x >> 2)
+            y2 = mask0_pad (y >> 2)
+            x3 = mask0_pad (x >> 3)
+            y3 = mask0_pad (y >> 3)
+
+  bmulc0 : [32] -> [32] -> [64]
+  bmulc0 x y = z0 && 0x1111111111111111
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z0 = (x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)
+
+  bmul64' : [64] -> [64] -> [128]
+  bmul64' a b = prod
+      where prod = pad (pmult a b)
+
+  bmulc0' : [64] -> [64] -> [128]
+  bmulc0' x y = z0 && 0x21084210842108421084210842108421
+      where x0 = (pad x) && 0x21084210842108421084210842108421
+            x1 = (pad x) && 0x42108421084210842108421084210842
+            x2 = (pad x) && 0x84210842108421084210842108421084
+            x3 = (pad x) && 0x08421084210842108421084210842108
+            x4 = (pad x) && 0x10842108421084210842108421084210
+            y0 = (pad y) && 0x21084210842108421084210842108421
+            y1 = (pad y) && 0x42108421084210842108421084210842
+            y2 = (pad y) && 0x84210842108421084210842108421084
+            y3 = (pad y) && 0x08421084210842108421084210842108
+            y4 = (pad y) && 0x10842108421084210842108421084210
+            z0 = (x0 * y0) ^ (x1 * y4) ^ (x2 * y3) ^ (x3 * y2) ^ (x4 * y1)
+
+  bmulc1' : [64] -> [64] -> [128]
+  bmulc1' x y = z1 && 0x42108421084210842108421084210842
+      where x0 = (pad x) && 0x21084210842108421084210842108421
+            x1 = (pad x) && 0x42108421084210842108421084210842
+            x2 = (pad x) && 0x84210842108421084210842108421084
+            x3 = (pad x) && 0x08421084210842108421084210842108
+            x4 = (pad x) && 0x10842108421084210842108421084210
+            y0 = (pad y) && 0x21084210842108421084210842108421
+            y1 = (pad y) && 0x42108421084210842108421084210842
+            y2 = (pad y) && 0x84210842108421084210842108421084
+            y3 = (pad y) && 0x08421084210842108421084210842108
+            y4 = (pad y) && 0x10842108421084210842108421084210
+            z1 = (x0 * y1) ^ (x1 * y0) ^ (x2 * y4) ^ (x3 * y3) ^ (x4 * y2)
+
+  bmulc2' : [64] -> [64] -> [128]
+  bmulc2' x y = z2 && 0x84210842108421084210842108421084
+      where x0 = (pad x) && 0x21084210842108421084210842108421
+            x1 = (pad x) && 0x42108421084210842108421084210842
+            x2 = (pad x) && 0x84210842108421084210842108421084
+            x3 = (pad x) && 0x08421084210842108421084210842108
+            x4 = (pad x) && 0x10842108421084210842108421084210
+            y0 = (pad y) && 0x21084210842108421084210842108421
+            y1 = (pad y) && 0x42108421084210842108421084210842
+            y2 = (pad y) && 0x84210842108421084210842108421084
+            y3 = (pad y) && 0x08421084210842108421084210842108
+            y4 = (pad y) && 0x10842108421084210842108421084210
+            z2 = (x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y4) ^ (x4 * y3)
+
+  bmulc3' : [64] -> [64] -> [128]
+  bmulc3' x y = z3 && 0x08421084210842108421084210842108
+      where x0 = (pad x) && 0x21084210842108421084210842108421
+            x1 = (pad x) && 0x42108421084210842108421084210842
+            x2 = (pad x) && 0x84210842108421084210842108421084
+            x3 = (pad x) && 0x08421084210842108421084210842108
+            x4 = (pad x) && 0x10842108421084210842108421084210
+            y0 = (pad y) && 0x21084210842108421084210842108421
+            y1 = (pad y) && 0x42108421084210842108421084210842
+            y2 = (pad y) && 0x84210842108421084210842108421084
+            y3 = (pad y) && 0x08421084210842108421084210842108
+            y4 = (pad y) && 0x10842108421084210842108421084210
+            z3 = (x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0) ^ (x4 * y4)
+
+  bmulc4' : [64] -> [64] -> [128]
+  bmulc4' x y = z4 && 0x10842108421084210842108421084210
+      where x0 = (pad x) && 0x21084210842108421084210842108421
+            x1 = (pad x) && 0x42108421084210842108421084210842
+            x2 = (pad x) && 0x84210842108421084210842108421084
+            x3 = (pad x) && 0x08421084210842108421084210842108
+            x4 = (pad x) && 0x10842108421084210842108421084210
+            y0 = (pad y) && 0x21084210842108421084210842108421
+            y1 = (pad y) && 0x42108421084210842108421084210842
+            y2 = (pad y) && 0x84210842108421084210842108421084
+            y3 = (pad y) && 0x08421084210842108421084210842108
+            y4 = (pad y) && 0x10842108421084210842108421084210
+            z4 = (x0 * y4) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1) ^ (x4 * y0)
+
+  bmulc' : [64] -> [64] -> [128]
+  bmulc' x y = z0' || z1' || z2' || z3' || z4'
+      where x0 = (pad x) && 0x21084210842108421084210842108421
+            x1 = (pad x) && 0x42108421084210842108421084210842
+            x2 = (pad x) && 0x84210842108421084210842108421084
+            x3 = (pad x) && 0x08421084210842108421084210842108
+            x4 = (pad x) && 0x10842108421084210842108421084210
+            y0 = (pad y) && 0x21084210842108421084210842108421
+            y1 = (pad y) && 0x42108421084210842108421084210842
+            y2 = (pad y) && 0x84210842108421084210842108421084
+            y3 = (pad y) && 0x08421084210842108421084210842108
+            y4 = (pad y) && 0x10842108421084210842108421084210
+            z0 = (x0 * y0) ^ (x1 * y4) ^ (x2 * y3) ^ (x3 * y2) ^ (x4 * y1)
+            z1 = (x0 * y1) ^ (x1 * y0) ^ (x2 * y4) ^ (x3 * y3) ^ (x4 * y2)
+            z2 = (x0 * y2) ^ (x1 * y1) ^ (x2 * y0) ^ (x3 * y4) ^ (x4 * y3)
+            z3 = (x0 * y3) ^ (x1 * y2) ^ (x2 * y1) ^ (x3 * y0) ^ (x4 * y4)
+            z4 = (x0 * y4) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1) ^ (x4 * y0)
+            z0' = z0 && 0x21084210842108421084210842108421
+            z1' = z1 && 0x42108421084210842108421084210842
+            z2' = z2 && 0x84210842108421084210842108421084
+            z3' = z3 && 0x08421084210842108421084210842108
+            z4' = z4 && 0x10842108421084210842108421084210
+}};
+
+time (prove_print abc {{ \x y -> mul_x0_y0 x y == (mul_x1_y3 (x << 1) (y << 3)) >> 4 }});
+time (prove_print abc {{ \x y -> mul_x0_y0 x y == (mul_x3_y1 (x << 3) (y << 1)) >> 4 }});
+time (prove_print abc {{ \x y -> mul_x0_y0 x y == (mul_x2_y2 (x << 2) (y << 2)) >> 4 }});
+
+time (prove_print abc {{ \x y -> mul_x2_y2 x y == (mul_x0_y0 (x >> 2) (y >> 2)) << 4 }});
+time (prove_print abc {{ \x y -> mul_x1_y3 x y == (mul_x0_y0 (x >> 1) (y >> 3)) << 4 }});
+time (prove_print abc {{ \x y -> mul_x3_y1 x y == (mul_x0_y0 (x >> 3) (y >> 1)) << 4 }});
+
+time (prove_print abc {{ \x y -> mul0 x y == mul0' x y }});
+time (prove_print abc {{ \x y -> mul0 x y == bmulc0 x y }});
+time (prove_print abc {{ \x y -> mul0' x y == bmulc0 x y }});
+time (prove_print abc {{ \x y -> mul0' x y == mul0'' x y }});
+
+time (prove_print abc {{ \x y -> mul0'' x y == mask0 (bmulr x y) }});
+time (prove_print abc {{ \x y -> mul0'' x y == mask0 (bmul32' x y) }});
+
+t0 <- time (prove_print abc {{ \x y -> bmulc0' x y == ((bmul64' x y) && 0x21084210842108421084210842108421) }});
+t1 <- time (prove_print abc {{ \x y -> bmulc1' x y == ((bmul64' x y) && 0x42108421084210842108421084210842) }});
+t2 <- time (prove_print abc {{ \x y -> bmulc2' x y == ((bmul64' x y) && 0x84210842108421084210842108421084) }});
+t3 <- time (prove_print abc {{ \x y -> bmulc3' x y == ((bmul64' x y) && 0x08421084210842108421084210842108) }});
+t4 <- time (prove_print abc {{ \x y -> bmulc4' x y == ((bmul64' x y) && 0x10842108421084210842108421084210) }});
+
+let ss = simpset [t0, t1, t2, t3, t4];
+time (prove_print do { simplify ss; abc; } {{ \x y -> bmulc' x y == bmul64' x y }});
+
+
+/*term <- llvm_extract m "bmul32_ret" llvm_pure;
+print_term term;
+
+let rule = rewrite (cryptol_ss ()) {{ \x y -> ((Prim.bvUExt (x && 0x22222222)) : [64]) * ((zero # (y && 0x22222222)) : [64]) == ((zero # x) * (zero # y)) }};
+print_term rule;
+
+let rule = rewrite (cryptol_ss ()) {{ \x y -> ((zero # (x && 0x22222222)) : [64]) * ((zero # (y && 0x22222222)) : [64]) == ((zero # x) * (zero # y)) }};
+print_term rule;
+
+let result = rewrite (addsimp' rule empty_ss) term;
+print_term result;*/
+
+
+
+/*term <- llvm_extract m "bmul32_ret" llvm_pure;
+print_term term;
+
+let rule = rewrite (cryptol_ss ()) {{ \x y -> bmulc_all x y == pmult_all x y }};
+print_term rule;
+
+let result = rewrite (addsimp' rule empty_ss) term;
+print_term result;*/
+
+
+//time (prove_print abc {{ \x y -> ((bmul32_ret x y) && 0x1111111111111111) == bmulc0 x y }});
+//time (prove_print abc {{ \x y -> bmul32_ret x y == bmul32' x y }});
+//time (prove_print abc {{ \x y -> bmul32_ret x y == pmult_all x y }});
+//time (prove_print abc {{ \x y -> (bmulc0 x y == pmult0 x y) && (bmulc1 x y == pmult1 x y) && (bmulc2 x y == pmult2 x y) && (bmulc3 x y == pmult3 x y) }});
+//time (prove_print abc {{ \x y -> (bmulc0 x y == pmult0 x y) && (bmulc1 x y == pmult1 x y) && (bmulc2 x y == pmult2 x y) && (bmulc3 x y == pmult3 x y) && (bmul32_ret x y == pmult_all x y) }});
+//time (prove_print abc {{ \x y -> (((bmul32_ret x y) && 0x1111111111111111) == bmulc0 x y) && (bmul32_ret x y == bmul32' x y) }});
+
+
+/*r0 <- time (llvm_verify m "bmul32" [] do {
+  x <- llvm_var "x" (llvm_int 32);
+  y <- llvm_var "y" (llvm_int 32);
+  llvm_ptr "r_high" (llvm_int 32);
+  r_high <- llvm_var "*r_high" (llvm_int 32);
+  llvm_ptr "r_low" (llvm_int 32);
+  r_low <- llvm_var "*r_low" (llvm_int 32);
+
+  let res = {{ bmulc x y }};
+  llvm_ensure {{ r_high == take`{32} res }};
+
+  //llvm_ensure_eq "*r_high" {{ take`{32} res }};
+  //llvm_ensure_eq "*r_low" {{ drop`{32} res }};
+
+  llvm_verify_tactic abc;
+});
+
+time (llvm_verify m "bmul32" [r0] do {
+  x <- llvm_var "x" (llvm_int 32);
+  y <- llvm_var "y" (llvm_int 32);
+  llvm_ptr "r_high" (llvm_int 32);
+  r_high <- llvm_var "*r_high" (llvm_int 32);
+  llvm_ptr "r_low" (llvm_int 32);
+  r_low <- llvm_var "*r_low" (llvm_int 32);
+
+  let res = {{ bmulc x y }};
+  llvm_ensure_eq "*r_high" {{ take`{32} res }};
+  llvm_ensure_eq "*r_low" {{ drop`{32} res }};
+
+  llvm_verify_tactic abc;
+});*/
+
+/*time (llvm_verify m "bmul32" [] do {
+  x <- llvm_var "x" (llvm_int 32);
+  y <- llvm_var "y" (llvm_int 32);
+  llvm_ptr "r_high" (llvm_int 32);
+  r_high <- llvm_var "*r_high" (llvm_int 32);
+  llvm_ptr "r_low" (llvm_int 32);
+  r_low <- llvm_var "*r_low" (llvm_int 32);
+
+  let res = {{ bmulr x y }};
+  llvm_ensure_eq "*r_high" {{ take`{32} res }};
+  llvm_ensure_eq "*r_low" {{ drop`{32} res }};
+
+  llvm_verify_tactic abc;
+});
+
+time (llvm_verify m "bmul32" [] do {
+  x <- llvm_var "x" (llvm_int 32);
+  y <- llvm_var "y" (llvm_int 32);
+  llvm_ptr "r_high" (llvm_int 32);
+  r_high <- llvm_var "*r_high" (llvm_int 32);
+  llvm_ptr "r_low" (llvm_int 32);
+  r_low <- llvm_var "*r_low" (llvm_int 32);
+
+  let res = {{ bmulc x y }};
+  llvm_ensure_eq "*r_high" {{ take`{32} res }};
+  llvm_ensure_eq "*r_low" {{ drop`{32} res }};
+
+  llvm_verify_tactic do {
+    //print_goal_size;
+    abc;
+  };
+});
+
+time (llvm_verify m "bmul32" [] do {
+  x <- llvm_var "x" (llvm_int 32);
+  y <- llvm_var "y" (llvm_int 32);
+  llvm_ptr "r_high" (llvm_int 32);
+  r_high <- llvm_var "*r_high" (llvm_int 32);
+  llvm_ptr "r_low" (llvm_int 32);
+  r_low <- llvm_var "*r_low" (llvm_int 32);
+
+  let res = {{ bmul32 x y }};
+  llvm_ensure_eq "*r_high" {{ res.0 }};
+  llvm_ensure_eq "*r_low" {{ res.1 }};
+
+  llvm_verify_tactic do {
+    //print_goal_size;
+    abc;
+  };
+});*/

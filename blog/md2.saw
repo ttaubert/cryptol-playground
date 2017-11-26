@@ -1,0 +1,7 @@
+import "md2.cry";
+
+let {{
+  p_coll a b c d = (a != b \/ c != d) && (compress a b == compress c d)
+}};
+
+time (sat_print abc {{ p_coll }});
