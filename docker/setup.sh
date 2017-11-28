@@ -26,7 +26,7 @@ cp -r z3*/* /usr/local/
 rm -fr z3*
 
 # Install SAW/Cryptol.
-curl -LO https://saw.galois.com/builds/nightly/saw-0.2-2017-09-07-Ubuntu14.04-64.tar.gz
+curl -LO https://saw.galois.com/builds/nightly/saw-0.2-2017-11-26-Ubuntu14.04-64.tar.gz
 tar xzvf saw-*.tar.gz -C /usr/local --strip-components=1
 rm saw-*.tar.gz
 

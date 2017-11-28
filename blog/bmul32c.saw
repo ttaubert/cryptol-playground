@@ -1,0 +1,119 @@
+m <- llvm_load_module "bmul32.bc";
+
+bmul32_ret <- llvm_extract m "bmul32_ret" llvm_pure;
+
+let {{
+  pad x = zero # x
+
+  m0 x = x && 0x1111111111111111
+  m0' x = x && 0x11111111
+  m0_pad x = m0 (pad x)
+
+  pmul0 : [32] -> [32] -> [64]
+  pmul0 x y = m0 (pad (pmult x y))
+
+  pmulr0 : [32] -> [32] -> [64]
+  pmulr0 a b = m0 ((take`{33} rs) @ 32).0
+      where rs = [init] # [ (r ^ (f a' b'), a' << 1, b' >> 1) | (r, a', b') <- rs ]
+            f : [64] -> [64] -> [64]
+            f a' b' = if (b' && 1) == 1 then a' else zero
+            init = (zero, pad a, pad b)
+
+  pmulr0' : [32] -> [32] -> [64]
+  pmulr0' a b = m0 ((take`{9} rs) @ 8).0
+      where rs = [init] # [ (r ^ (f a' b'), a' << 4, b' >> 4) | (r, a', b') <- rs ]
+            f : [64] -> [64] -> [64]
+            f a' b' = if (b' && 1) == 1 then a' else zero
+            init = (zero, pad a, pad b)
+
+  bmulc : [32] -> [32] -> [64]
+  bmulc x y = z0 && 0x1111111111111111
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z0 = (x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)
+
+  bmulc' : [32] -> [32] -> [64]
+  bmulc' x y = m0 ((x0 * y0) ^ ((x1 * y3) << 4) ^ ((x2 * y2) << 4) ^ ((x3 * y1) << 4))
+      where x0 = m0_pad x
+            y0 = m0_pad y
+            x1 = m0_pad (x >> 1)
+            y1 = m0_pad (y >> 1)
+            x2 = m0_pad (x >> 2)
+            y2 = m0_pad (y >> 2)
+            x3 = m0_pad (x >> 3)
+            y3 = m0_pad (y >> 3)
+
+  bmulc'' : [32] -> [32] -> [64]
+  bmulc'' x y = (pmul0 x0 y0) ^ ((pmul0 x1 y3) << 4) ^ ((pmul0 x2 y2) << 4) ^ ((pmul0 x3 y1) << 4)
+      where x0 = m0' x
+            y0 = m0' y
+            x1 = m0' (x >> 1)
+            y1 = m0' (y >> 1)
+            x2 = m0' (x >> 2)
+            y2 = m0' (y >> 2)
+            x3 = m0' (x >> 3)
+            y3 = m0' (y >> 3)
+
+  bmulc''' : [32] -> [32] -> [64]
+  bmulc''' x y = (pmulr0 x0 y0) ^ ((pmulr0 x1 y3) << 4) ^ ((pmulr0 x2 y2) << 4) ^ ((pmulr0 x3 y1) << 4)
+      where x0 = m0' x
+            y0 = m0' y
+            x1 = m0' (x >> 1)
+            y1 = m0' (y >> 1)
+            x2 = m0' (x >> 2)
+            y2 = m0' (y >> 2)
+            x3 = m0' (x >> 3)
+            y3 = m0' (y >> 3)
+
+  bmulc'''' : [32] -> [32] -> [64]
+  bmulc'''' x y = (pmulr0' x0 y0) ^ ((pmulr0' x1 y3) << 4) ^ ((pmulr0' x2 y2) << 4) ^ ((pmulr0' x3 y1) << 4)
+      where x0 = m0' x
+            y0 = m0' y
+            x1 = m0' (x >> 1)
+            y1 = m0' (y >> 1)
+            x2 = m0' (x >> 2)
+            y2 = m0' (y >> 2)
+            x3 = m0' (x >> 3)
+            y3 = m0' (y >> 3)
+}};
+
+let simpset x = addsimps x empty_ss;
+
+r0 <- time (prove_print abc {{ \x y -> pmul0 (m0' x) (m0' y) == m0 ((m0_pad x) * (m0_pad y)) }});
+
+time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc x y }});
+time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc' x y }});
+time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc'' x y }});
+
+time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == pmul0 x y }});
+//time (prove_print abc {{ \x y -> bmul32_ret x y == pmul x y }});
+
+print "\n";
+let ss = simpset [r0];
+time (prove_print do { simplify ss; abc; } {{ \x y -> bmulc' x y == bmulc'' x y }});
+time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc'' x y }});
+time (prove_print abc {{ \x y -> pmulr0' (m0' x) (m0' y) == pmul0 (m0' x) (m0' y) }});
+r1 <- time (prove_print abc {{ \x y -> pmulr0' (m0' x) (m0' y) == m0 ((m0_pad x) * (m0_pad y)) }});
+r2 <- time (prove_print abc {{ \x y -> m0 ((m0_pad x) * (m0_pad y)) == pmulr0' (m0' x) (m0' y) }});
+
+print "\n";
+let ss2 = simpset [r1, r2];
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmul0 x y == bmulc' x y }});
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmul0 x y == bmulc'' x y }});
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmul0 x y == bmulc''' x y }});
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmul0 x y == bmulc'''' x y }});
+
+print "\n";
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmulr0 x y == bmulc' x y }});
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmulr0 x y == bmulc'' x y }});
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmulr0 x y == bmulc''' x y }});
+time (prove_print do { simplify ss2; abc; } {{ \x y -> pmulr0 x y == bmulc'''' x y }});
+
+print "\n";
+time (prove_print abc {{ \x y -> pmul0 x y == pmulr0 x y }});
