@@ -1,0 +1,52 @@
+m <- llvm_load_module "bmul32.bc";
+
+bmul32_ret <- llvm_extract m "bmul32_ret" llvm_pure;
+
+let {{
+  pad x = zero # x
+
+  pmul : [32] -> [32] -> [64]
+  pmul x y = pad (pmult x y)
+
+  pad0 : [32] -> [64]
+  pad0 x = zero # (x && 0x11111111)
+
+  bmulc : [32] -> [32] -> [64]
+  bmulc x y = z0 && 0x1111111111111111
+      where x0 = pad (x && 0x11111111)
+            x1 = pad (x && 0x22222222)
+            x2 = pad (x && 0x44444444)
+            x3 = pad (x && 0x88888888)
+            y0 = pad (y && 0x11111111)
+            y1 = pad (y && 0x22222222)
+            y2 = pad (y && 0x44444444)
+            y3 = pad (y && 0x88888888)
+            z0 = (x0 * y0) ^ (x1 * y3) ^ (x2 * y2) ^ (x3 * y1)
+
+  bmulc0 : [32] -> [32] -> [64]
+  bmulc0 x y = z0 && 0x1111111111111111
+      where x0 = pad0 x
+            y0 = pad0 y
+            z0 = x0 * y0
+}};
+
+
+print_term bmul32_ret;
+
+let rule = rewrite (cryptol_ss ()) {{ \x y -> bmul32_ret x y == pmul x y }};
+prove_print abc rule;
+
+let rule2 = unfold_term ["pmul"] rule;
+
+let result = rewrite (addsimp' rule2 empty_ss) bmul32_ret;
+print_term result;
+
+
+/*let t = unfold_term ["bmulc0"] {{ bmulc0 }};
+print_term t;
+
+let rule = rewrite (cryptol_ss ()) {{ \(x:[64]) (y:[64]) -> x * y == y + x }};
+print_term rule;
+
+let result = rewrite (addsimp' rule empty_ss) bmul32_ret;
+print_term result;*/

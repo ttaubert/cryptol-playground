@@ -9,6 +9,9 @@ let {{
   m0' x = x && 0x11111111
   m0_pad x = m0 (pad x)
 
+  pmul : [32] -> [32] -> [64]
+  pmul x y = pad (pmult x y)
+
   pmul0 : [32] -> [32] -> [64]
   pmul0 x y = m0 (pad (pmult x y))
 
@@ -20,11 +23,127 @@ let {{
             init = (zero, pad a, pad b)
 
   pmulr0' : [32] -> [32] -> [64]
-  pmulr0' a b = m0 ((take`{9} rs) @ 8).0
+  pmulr0' a b = ((take`{9} rs) @ 8).0
       where rs = [init] # [ (r ^ (f a' b'), a' << 4, b' >> 4) | (r, a', b') <- rs ]
             f : [64] -> [64] -> [64]
             f a' b' = if (b' && 1) == 1 then a' else zero
             init = (zero, pad a, pad b)
+
+  pmulr0'' : [32] -> [32] -> [64]
+  pmulr0'' a b = r8.0
+      where r0 = (zero, pad a, pad b) : ([64], [64], [64])
+            r1 = (r0.0 ^ (f r0.1 r0.2), r0.1 << 4, r0.2 >> 4)
+            r2 = (r1.0 ^ (f r1.1 r1.2), r1.1 << 4, r1.2 >> 4)
+            r3 = (r2.0 ^ (f r2.1 r2.2), r2.1 << 4, r2.2 >> 4)
+            r4 = (r3.0 ^ (f r3.1 r3.2), r3.1 << 4, r3.2 >> 4)
+            r5 = (r4.0 ^ (f r4.1 r4.2), r4.1 << 4, r4.2 >> 4)
+            r6 = (r5.0 ^ (f r5.1 r5.2), r5.1 << 4, r5.2 >> 4)
+            r7 = (r6.0 ^ (f r6.1 r6.2), r6.1 << 4, r6.2 >> 4)
+            r8 = (r7.0 ^ (f r7.1 r7.2), r7.1 << 4, r7.2 >> 4)
+            f a' b' = if (b' && 1) == 1 then a' else zero
+
+  pmulr0''' : [32] -> [32] -> [64]
+  pmulr0''' a b = r8.0 ^ r7.0 ^ r6.0 ^ r5.0 ^ r4.0 ^ r3.0 ^ r2.0 ^ r1.0
+      where r0 = (zero, pad a, pad b) : ([64], [64], [64])
+            r1 = (f r0.1 r0.2, r0.1 << 4, r0.2 >> 4)
+            r2 = (f r1.1 r1.2, r1.1 << 4, r1.2 >> 4)
+            r3 = (f r2.1 r2.2, r2.1 << 4, r2.2 >> 4)
+            r4 = (f r3.1 r3.2, r3.1 << 4, r3.2 >> 4)
+            r5 = (f r4.1 r4.2, r4.1 << 4, r4.2 >> 4)
+            r6 = (f r5.1 r5.2, r5.1 << 4, r5.2 >> 4)
+            r7 = (f r6.1 r6.2, r6.1 << 4, r6.2 >> 4)
+            r8 = (f r7.1 r7.2, r7.1 << 4, r7.2 >> 4)
+            f a' b' = if (b' && 1) == 1 then a' else zero
+
+  pmul_unfolded : [32] -> [32] -> [64]
+  pmul_unfolded a b = r32.0 ^ r31.0 ^ r30.0 ^ r29.0 ^ r28.0 ^ r27.0 ^ r26.0 ^ r25.0 ^
+                      r24.0 ^ r23.0 ^ r22.0 ^ r21.0 ^ r20.0 ^ r19.0 ^ r18.0 ^ r17.0 ^
+                      r16.0 ^ r15.0 ^ r14.0 ^ r13.0 ^ r12.0 ^ r11.0 ^ r10.0 ^ r9.0  ^
+                      r8.0  ^ r7.0  ^ r6.0  ^ r5.0  ^ r4.0  ^ r3.0  ^ r2.0  ^ r1.0
+      where r0  = (zero, pad a, pad b) : ([64], [64], [64])
+            r1  = (f r0.1  r0.2,  r0.1  << 1, r0.2  >> 1)
+            r2  = (f r1.1  r1.2,  r1.1  << 1, r1.2  >> 1)
+            r3  = (f r2.1  r2.2,  r2.1  << 1, r2.2  >> 1)
+            r4  = (f r3.1  r3.2,  r3.1  << 1, r3.2  >> 1)
+            r5  = (f r4.1  r4.2,  r4.1  << 1, r4.2  >> 1)
+            r6  = (f r5.1  r5.2,  r5.1  << 1, r5.2  >> 1)
+            r7  = (f r6.1  r6.2,  r6.1  << 1, r6.2  >> 1)
+            r8  = (f r7.1  r7.2,  r7.1  << 1, r7.2  >> 1)
+            r9  = (f r8.1  r8.2,  r8.1  << 1, r8.2  >> 1)
+            r10 = (f r9.1  r9.2,  r9.1  << 1, r9.2  >> 1)
+            r11 = (f r10.1 r10.2, r10.1 << 1, r10.2 >> 1)
+            r12 = (f r11.1 r11.2, r11.1 << 1, r11.2 >> 1)
+            r13 = (f r12.1 r12.2, r12.1 << 1, r12.2 >> 1)
+            r14 = (f r13.1 r13.2, r13.1 << 1, r13.2 >> 1)
+            r15 = (f r14.1 r14.2, r14.1 << 1, r14.2 >> 1)
+            r16 = (f r15.1 r15.2, r15.1 << 1, r15.2 >> 1)
+            r17 = (f r16.1 r16.2, r16.1 << 1, r16.2 >> 1)
+            r18 = (f r17.1 r17.2, r17.1 << 1, r17.2 >> 1)
+            r19 = (f r18.1 r18.2, r18.1 << 1, r18.2 >> 1)
+            r20 = (f r19.1 r19.2, r19.1 << 1, r19.2 >> 1)
+            r21 = (f r20.1 r20.2, r20.1 << 1, r20.2 >> 1)
+            r22 = (f r21.1 r21.2, r21.1 << 1, r21.2 >> 1)
+            r23 = (f r22.1 r22.2, r22.1 << 1, r22.2 >> 1)
+            r24 = (f r23.1 r23.2, r23.1 << 1, r23.2 >> 1)
+            r25 = (f r24.1 r24.2, r24.1 << 1, r24.2 >> 1)
+            r26 = (f r25.1 r25.2, r25.1 << 1, r25.2 >> 1)
+            r27 = (f r26.1 r26.2, r26.1 << 1, r26.2 >> 1)
+            r28 = (f r27.1 r27.2, r27.1 << 1, r27.2 >> 1)
+            r29 = (f r28.1 r28.2, r28.1 << 1, r28.2 >> 1)
+            r30 = (f r29.1 r29.2, r29.1 << 1, r29.2 >> 1)
+            r31 = (f r30.1 r30.2, r30.1 << 1, r30.2 >> 1)
+            r32 = (f r31.1 r31.2, r31.1 << 1, r31.2 >> 1)
+            f a' b' = if (b' && 1) == 1 then a' else zero
+
+  pmul_unfold : [32] -> [32] -> [32][64]
+  pmul_unfold a b = reverse [r32.0, r31.0, r30.0, r29.0, r28.0, r27.0, r26.0, r25.0,
+                             r24.0, r23.0, r22.0, r21.0, r20.0, r19.0, r18.0, r17.0,
+                             r16.0, r15.0, r14.0, r13.0, r12.0, r11.0, r10.0, r9.0 ,
+                             r8.0 , r7.0 , r6.0 , r5.0 , r4.0 , r3.0 , r2.0 , r1.0]
+      where r0  = (zero, pad a, pad b) : ([64], [64], [64])
+            r1  = (f r0.1  r0.2,  r0.1  << 1, r0.2  >> 1)
+            r2  = (f r1.1  r1.2,  r1.1  << 1, r1.2  >> 1)
+            r3  = (f r2.1  r2.2,  r2.1  << 1, r2.2  >> 1)
+            r4  = (f r3.1  r3.2,  r3.1  << 1, r3.2  >> 1)
+            r5  = (f r4.1  r4.2,  r4.1  << 1, r4.2  >> 1)
+            r6  = (f r5.1  r5.2,  r5.1  << 1, r5.2  >> 1)
+            r7  = (f r6.1  r6.2,  r6.1  << 1, r6.2  >> 1)
+            r8  = (f r7.1  r7.2,  r7.1  << 1, r7.2  >> 1)
+            r9  = (f r8.1  r8.2,  r8.1  << 1, r8.2  >> 1)
+            r10 = (f r9.1  r9.2,  r9.1  << 1, r9.2  >> 1)
+            r11 = (f r10.1 r10.2, r10.1 << 1, r10.2 >> 1)
+            r12 = (f r11.1 r11.2, r11.1 << 1, r11.2 >> 1)
+            r13 = (f r12.1 r12.2, r12.1 << 1, r12.2 >> 1)
+            r14 = (f r13.1 r13.2, r13.1 << 1, r13.2 >> 1)
+            r15 = (f r14.1 r14.2, r14.1 << 1, r14.2 >> 1)
+            r16 = (f r15.1 r15.2, r15.1 << 1, r15.2 >> 1)
+            r17 = (f r16.1 r16.2, r16.1 << 1, r16.2 >> 1)
+            r18 = (f r17.1 r17.2, r17.1 << 1, r17.2 >> 1)
+            r19 = (f r18.1 r18.2, r18.1 << 1, r18.2 >> 1)
+            r20 = (f r19.1 r19.2, r19.1 << 1, r19.2 >> 1)
+            r21 = (f r20.1 r20.2, r20.1 << 1, r20.2 >> 1)
+            r22 = (f r21.1 r21.2, r21.1 << 1, r21.2 >> 1)
+            r23 = (f r22.1 r22.2, r22.1 << 1, r22.2 >> 1)
+            r24 = (f r23.1 r23.2, r23.1 << 1, r23.2 >> 1)
+            r25 = (f r24.1 r24.2, r24.1 << 1, r24.2 >> 1)
+            r26 = (f r25.1 r25.2, r25.1 << 1, r25.2 >> 1)
+            r27 = (f r26.1 r26.2, r26.1 << 1, r26.2 >> 1)
+            r28 = (f r27.1 r27.2, r27.1 << 1, r27.2 >> 1)
+            r29 = (f r28.1 r28.2, r28.1 << 1, r28.2 >> 1)
+            r30 = (f r29.1 r29.2, r29.1 << 1, r29.2 >> 1)
+            r31 = (f r30.1 r30.2, r30.1 << 1, r30.2 >> 1)
+            r32 = (f r31.1 r31.2, r31.1 << 1, r31.2 >> 1)
+            f a' b' = if (b' && 1) == 1 then a' else zero
+
+  pmul_unfolded' : [32] -> [32] -> [64]
+  pmul_unfolded' a b = ys ! 0
+      where xs = pmul_unfold a b
+            ys = [0] # [ y ^ x | y <- ys | x <- xs ]
+
+  pmul_unfolded0 : [32] -> [32] -> [64]
+  pmul_unfolded0 a b = (xs @ 0)  ^ (xs @ 4)  ^ (xs @ 8)  ^ (xs @ 12) ^
+                       (xs @ 16) ^ (xs @ 20) ^ (xs @ 24) ^ (xs @ 28)
+      where xs = pmul_unfold a b
 
   bmulc : [32] -> [32] -> [64]
   bmulc x y = z0 && 0x1111111111111111
@@ -85,13 +204,21 @@ let {{
 
 let simpset x = addsimps x empty_ss;
 
+time (prove_print abc {{ \x y -> pmul x y == pmul_unfolded' x y }});
+time (prove_print abc {{ \x y -> pmul0 (m0' x) (m0' y) == pmul_unfolded0 (m0' x) (m0' y) }});
+time (prove_print abc {{ \x y -> m0 ((m0_pad x) * (m0_pad y)) == pmul_unfolded0 (m0' x) (m0' y) }});
+
+print "\n";
 r0 <- time (prove_print abc {{ \x y -> pmul0 (m0' x) (m0' y) == m0 ((m0_pad x) * (m0_pad y)) }});
+
+//time (prove_print abc {{ \x y -> bmul32_ret x y == pmul_unfolded x y }});
+//time (prove_print abc {{ \x y -> bmulc x y == m0 (pmul_unfolded x y) }});
+time (prove_print abc {{ \x y -> bmulc (m0' x) (m0' y) == m0 (pmul_unfolded (m0' x) (m0' y)) }});
 
 time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc x y }});
 time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc' x y }});
 time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc'' x y }});
-
-time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == pmul0 x y }});
+//time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == pmul0 x y }});
 //time (prove_print abc {{ \x y -> bmul32_ret x y == pmul x y }});
 
 print "\n";
@@ -101,6 +228,8 @@ time (prove_print abc {{ \x y -> m0 (bmul32_ret x y) == bmulc'' x y }});
 time (prove_print abc {{ \x y -> pmulr0' (m0' x) (m0' y) == pmul0 (m0' x) (m0' y) }});
 r1 <- time (prove_print abc {{ \x y -> pmulr0' (m0' x) (m0' y) == m0 ((m0_pad x) * (m0_pad y)) }});
 r2 <- time (prove_print abc {{ \x y -> m0 ((m0_pad x) * (m0_pad y)) == pmulr0' (m0' x) (m0' y) }});
+r3 <- time (prove_print abc {{ \x y -> m0 ((m0_pad x) * (m0_pad y)) == pmulr0'' (m0' x) (m0' y) }});
+r4 <- time (prove_print abc {{ \x y -> m0 ((m0_pad x) * (m0_pad y)) == pmulr0''' (m0' x) (m0' y) }});
 
 print "\n";
 let ss2 = simpset [r1, r2];
